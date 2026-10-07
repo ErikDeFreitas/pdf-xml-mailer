@@ -1,0 +1,17 @@
+# Configuração local e credenciais: NUNCA versionar
+config.ini
+.env
+*.env
+
+# Documentos reais (CT-e, faturas): nunca versionar
+*.pdf
+*.xml
+entrada/
+enviados/
+erros/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

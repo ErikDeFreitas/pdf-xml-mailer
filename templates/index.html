@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="token" content="{{ token }}">
+<title>Envio de PDF + XML</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --txt:#1f2430; --mut:#6b7280; --bd:#d9dde3;
+          --ok:#15803d; --err:#b91c1c; --warn:#b45309; --pri:#2563eb; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--txt); }
+  main { max-width: 900px; margin: 32px auto; padding: 0 16px; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  .sub { color: var(--mut); margin-bottom: 20px; font-size: .95rem; }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:10px; padding:16px; margin-bottom:16px; }
+  #drop { border:2px dashed var(--bd); border-radius:10px; padding:36px 16px; text-align:center;
+          color:var(--mut); cursor:pointer; transition:.15s; }
+  #drop.over { border-color:var(--pri); background:#eff6ff; color:var(--pri); }
+  table { width:100%; border-collapse:collapse; font-size:.92rem; }
+  th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--bd); vertical-align:top; }
+  th { color:var(--mut); font-weight:600; font-size:.8rem; text-transform:uppercase; }
+  .ok { color:var(--ok); } .err { color:var(--err); } .warn { color:var(--warn); } .mut { color:var(--mut); }
+  .actions { display:flex; gap:8px; align-items:center; margin-top:12px; flex-wrap:wrap; }
+  button { font:inherit; padding:8px 16px; border-radius:8px; border:1px solid var(--bd);
+           background:#fff; cursor:pointer; }
+  button.primary { background:var(--pri); color:#fff; border-color:var(--pri); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  #resumo { margin-left:auto; color:var(--mut); font-size:.9rem; }
+  #aviso { display:none; background:#fef2f2; border:1px solid #fecaca; color:var(--err);
+           padding:10px 12px; border-radius:8px; margin-bottom:16px; }
+  .rm { border:none; background:none; color:var(--mut); padding:0 4px; cursor:pointer; }
+  #vctoBox { margin-top:14px; }
+  #vctoBox label { font-weight:600; margin-right:8px; }
+  #vctoBox input { font:inherit; padding:6px 10px; border:1px solid var(--bd); border-radius:8px; }
+  #vctoBox .dica { color:var(--mut); font-size:.85rem; margin-left:8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Envio de PDF + XML</h1>
+  <div class="sub">Arraste os arquivos. Cada PDF é pareado com o XML de mesmo nome e vira um e-mail.</div>
+
+  <div id="aviso"></div>
+
+  <div class="card">
+    <div id="drop">Arraste PDFs e XMLs aqui ou clique para selecionar</div>
+    <input id="input" type="file" multiple accept=".pdf,.xml" hidden>
+  </div>
+
+  <div class="card" id="listaCard" hidden>
+    <div class="mut" id="destino" style="margin-bottom:8px"></div>
+    <table>
+      <thead><tr><th>Nome</th><th>PDF</th><th>XML</th><th>Assunto</th><th>Status</th><th></th></tr></thead>
+      <tbody id="linhas"></tbody>
+    </table>
+    <div id="vctoBox" hidden>
+      <label for="vcto">Vencimento</label>
+      <input id="vcto" type="date">
+      <span class="dica">vai no corpo do e-mail (“Vcto: dd/mm/aaaa”)</span>
+    </div>
+    <div class="actions">
+      <button class="primary" id="btnEnviar">Enviar e-mails</button>
+      <button id="btnLimpar">Limpar tudo</button>
+      <span id="resumo"></span>
+    </div>
+  </div>
+</main>
+
+<script>
+const grupos = new Map();   // chave (nome minúsculo) -> {nome, pdf, xml, status, erro}
+let cfg = null, enviando = false;
+const TOKEN = document.querySelector('meta[name=token]').content;  // exigido pelo servidor em cada envio
+
+const $ = id => document.getElementById(id);
+const drop = $('drop'), input = $('input');
+
+fetch('/config').then(r => r.json().then(j => ({ok: r.ok, j}))).then(({ok, j}) => {
+  if (!ok) { mostrarAviso(j.erro || 'Erro ao ler a configuração.'); return; }
+  cfg = j;
+  $('destino').textContent = 'Destinatário: ' + cfg.destinatario;
+  $('vctoBox').hidden = !cfg.exige_vcto;
+  render();
+});
+
+// <input type="date"> entrega aaaa-mm-dd; o e-mail usa dd/mm/aaaa.
+function vctoBR() {
+  const v = $('vcto').value;
+  return v ? v.split('-').reverse().join('/') : '';
+}
+$('vcto').addEventListener('input', render);
+
+function mostrarAviso(t) { const a = $('aviso'); a.textContent = t; a.style.display = 'block'; }
+
+drop.onclick = () => input.click();
+input.onchange = () => { adicionar(input.files); input.value = ''; };
+['dragenter','dragover'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add('over'); }));
+['dragleave','drop'].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', ev => adicionar(ev.dataTransfer.files));
+
+function adicionar(lista) {
+  if (enviando) return;
+  for (const f of lista) {
+    const m = f.name.match(/^(.*)\.(pdf|xml)$/i);
+    if (!m) continue;
+    const nome = m[1], tipo = m[2].toLowerCase(), chave = nome.toLowerCase();
+    if (!grupos.has(chave)) grupos.set(chave, {nome, pdf: null, xml: null, status: 'pendente', erro: ''});
+    const g = grupos.get(chave);
+    g[tipo] = f;
+    if (g.status === 'erro') g.status = 'pendente';
+  }
+  render();
+}
+
+function assunto(nome) {
+  return cfg ? cfg.assunto.replace('{nome}', nome) : nome;
+}
+
+function render() {
+  const tb = $('linhas');
+  tb.replaceChildren();
+  const itens = [...grupos.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  $('listaCard').hidden = itens.length === 0;
+
+  let prontos = 0, incompletos = 0, enviados = 0, erros = 0;
+  for (const [chave, g] of itens) {
+    const completo = g.pdf && g.xml;
+    if (g.status === 'ok') enviados++;
+    else if (g.status === 'erro') erros++;
+    else if (completo) prontos++;
+    else incompletos++;
+
+    const tr = document.createElement('tr');
+    const cel = (txt, cls) => { const td = document.createElement('td'); td.textContent = txt; if (cls) td.className = cls; tr.appendChild(td); return td; };
+    cel(g.nome);
+    cel(g.pdf ? '✓' : '✗ falta', g.pdf ? 'ok' : 'err');
+    cel(g.xml ? '✓' : '✗ falta', g.xml ? 'ok' : 'err');
+    cel(completo ? assunto(g.nome) : '—', 'mut');
+
+    let txt, cls;
+    if (g.status === 'ok') { txt = 'Enviado'; cls = 'ok'; }
+    else if (g.status === 'enviando') { txt = 'Enviando…'; cls = 'warn'; }
+    else if (g.status === 'erro') { txt = 'Erro: ' + g.erro; cls = 'err'; }
+    else if (!completo) { txt = 'Incompleto'; cls = 'warn'; }
+    else { txt = 'Pronto'; cls = ''; }
+    cel(txt, cls);
+
+    const td = document.createElement('td');
+    if (!enviando) {
+      const b = document.createElement('button');
+      b.className = 'rm'; b.textContent = '✕'; b.title = 'Remover';
+      b.onclick = () => { grupos.delete(chave); render(); };
+      td.appendChild(b);
+    }
+    tr.appendChild(td);
+    tb.appendChild(tr);
+  }
+
+  $('resumo').textContent =
+    `${prontos} pronto(s) · ${incompletos} incompleto(s) · ${enviados} enviado(s) · ${erros} erro(s)`;
+  const faltaVcto = cfg && cfg.exige_vcto && !vctoBR();
+  $('btnEnviar').disabled = enviando || !cfg || (prontos === 0) || faltaVcto;
+  $('btnEnviar').title = faltaVcto ? 'Informe o vencimento' : '';
+  $('btnLimpar').disabled = enviando;
+}
+
+$('btnLimpar').onclick = () => { grupos.clear(); render(); };
+
+$('btnEnviar').onclick = async () => {
+  const fila = [...grupos.values()].filter(g => g.pdf && g.xml && g.status !== 'ok');
+  if (!fila.length) return;
+  const vcto = vctoBR();
+  const infoVcto = cfg.exige_vcto ? `\nVencimento: ${vcto}` : '';
+  if (!confirm(`Enviar ${fila.length} e-mail(s) para ${cfg.destinatario}?${infoVcto}`)) return;
+
+  enviando = true; $('vcto').disabled = true; render();
+  for (const g of fila) {
+    g.status = 'enviando'; g.erro = ''; render();
+    const fd = new FormData();
+    fd.append('nome', g.nome);
+    fd.append('pdf', g.pdf);
+    fd.append('xml', g.xml);
+    fd.append('vcto', vcto);
+    try {
+      const r = await fetch('/enviar', {method: 'POST', body: fd, headers: {'X-Token': TOKEN}});
+      const j = await r.json();
+      if (j.ok) g.status = 'ok';
+      else { g.status = 'erro'; g.erro = j.erro || 'falha desconhecida'; }
+    } catch (e) {
+      g.status = 'erro'; g.erro = String(e);
+    }
+    render();
+    await new Promise(res => setTimeout(res, (cfg.intervalo || 0) * 1000));
+  }
+  enviando = false; $('vcto').disabled = false; render();
+};
+</script>
+</body>
+</html>
