@@ -76,3 +76,13 @@ def test_sem_client_id_levanta_conta_nao_configurada(monkeypatch):
 def test_caminho_cache_usa_localappdata(tmp_path, monkeypatch):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     assert conta_mod.caminho_cache() == tmp_path / "EnviadorEmails" / "token_cache.bin"
+
+
+def test_cache_de_token_criptografado_funciona(tmp_path, monkeypatch):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    cache = conta_mod._criar_cache()
+    cache.add({"client_id": "c", "scope": ["s"], "token_endpoint": "https://login.microsoftonline.com/t/oauth2/v2.0/token",
+               "response": {"access_token": "SEGREDO", "token_type": "Bearer", "expires_in": 3600}})
+    arquivo = conta_mod.caminho_cache()
+    assert arquivo.exists()
+    assert b"SEGREDO" not in arquivo.read_bytes()  # DPAPI: nada em texto puro

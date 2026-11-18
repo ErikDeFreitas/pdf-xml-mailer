@@ -1,7 +1,9 @@
 # Configuração local e credenciais: NUNCA versionar
 config.ini
+config.json
 .env
 *.env
+token_cache.bin
 
 # Documentos reais (CT-e, faturas): nunca versionar
 *.pdf
@@ -10,8 +12,14 @@ entrada/
 enviados/
 erros/
 
-# Python
+# Python / build
 __pycache__/
 *.pyc
 .venv/
 venv/
+build/
+dist/
+.pytest_cache/
+
+# Instruções locais do Claude (igual ao mesclador)
+claude.md

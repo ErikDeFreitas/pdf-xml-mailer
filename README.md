@@ -1,79 +1,102 @@
-# Enviador de PDF + XML por e-mail
+# Enviador de PDF + XML
 
-Envia um e-mail para um destinatário fixo para cada par **PDF + XML de mesmo nome**.
-O assunto muda apenas no nome do arquivo (`{nome}`); o corpo é sempre o mesmo
-(`corpo.html`, com `corpo.txt` como versão em texto simples).
+Envia **um e-mail para cada par PDF + XML de mesmo nome** (ex.: `123814.pdf` + `123814.xml`),
+com os dois arquivos anexados. O assunto usa o nome do par e o corpo leva a data de vencimento.
 
-## Instalação
+## Usar
 
-```bash
-python -m venv .venv
-# Windows: .venv\Scripts\activate    |  Linux/macOS: source .venv/bin/activate
-pip install -r requirements.txt
-```
+Baixe o `EnviadorEmails.exe` da última [Release](../../releases/latest) e abra.
 
-## Configuração
+**Primeiro acesso:** clique em **Entrar com a Microsoft** (o login acontece no navegador, com MFA se
+houver) e informe **Para** (obrigatório) e **Cco** (opcional). Para trocar depois: **Configurações**.
 
-1. Copie `config.exemplo.ini` para `config.ini` e preencha SMTP, usuário, remetente, destinatário e assunto.
-   - Use `{nome}` no assunto, por exemplo: `assunto = EMPRESA - CTE {nome} - TEXTO FIXO`.
-2. Edite o corpo do e-mail. **Mantenha os dois arquivos iguais**:
-   - `corpo.html`: versão que os clientes de e-mail exibem (aceita negrito com `<b>`).
-   - `corpo.txt`: versão em texto simples, usada como alternativa.
-   - O vencimento usa o campo `{vcto}` nos dois arquivos. Na interface há um campo **Vencimento**
-     (obrigatório); na linha de comando use `--vcto dd/mm/aaaa`. Se remover `{vcto}` dos arquivos,
-     o campo some e o corpo passa a ser 100% fixo.
+**Enviar:**
+1. Arraste PDFs, XMLs ou pastas para a janela (ou use **Escolher arquivos** / **Escolher pasta**).
+2. Confira os pares na tabela. Arquivo sem par aparece como aviso e não é enviado.
+3. Informe o **Vencimento** (dd/mm/aaaa) e, se quiser, ajuste o **Cco** (o último valor fica salvo).
+4. Clique em **Enviar N e-mails** e confirme.
 
-3. Guarde a **senha** no cofre do sistema (no Windows, o Gerenciador de Credenciais), sem escrevê-la em arquivo:
-   ```bash
-   python configurar_senha.py
-   ```
-   Para apagar depois: `python configurar_senha.py --remover`.
+Cada linha mostra o andamento: Enviando, Enviado, Enviado com aviso ou Erro (clique para ver o motivo).
 
-> Gmail/Office 365 geralmente exigem **senha de aplicativo** ou SMTP autenticado liberado.
+## O que acontece com os arquivos
+
+| Situação | Para onde vai |
+|---|---|
+| E-mail enviado | `enviados/` dentro da pasta de onde o arquivo veio |
+| Erro no envio ou arquivo inválido | `erros/` dentro da pasta de onde o arquivo veio |
+| Enviado, mas o arquivo estava aberto e não pôde ser movido | Fica no lugar; a linha mostra **Enviado com aviso** |
+| Conexão caiu de vez no meio do lote | Os restantes ficam no lugar para um novo envio |
+| Sem par | Fica no lugar |
+
+Se já existir um arquivo com o mesmo nome em `enviados/`, o novo vira `nome_2.pdf`, `nome_3.pdf`…
+Como os enviados saem da pasta, enviar a mesma pasta de novo não repete e-mails.
 
 ## Segurança
 
-- **A senha nunca fica em arquivo do projeto.** Ordem de busca: variável de ambiente
-  `ENVIADOR_SMTP_SENHA` → cofre do sistema (`configurar_senha.py`) → pergunta no terminal
-  (fica só na memória). Um `senha =` antigo no `config.ini` ainda funciona, mas gera aviso: apague-o.
-- `config.ini` (e-mails, assunto) e os documentos reais (`*.pdf`, `*.xml`, `entrada/`, `enviados/`,
-  `erros/`) estão no `.gitignore`. Antes de cada commit, rode `git status` e confira o que vai subir.
-- Prefira um repositório **privado**: o código é de uso interno e o assunto/corpo podem citar a empresa.
-- Se uma senha chegou a ser commitada, **troque a senha** e trate-a como vazada (apagar o commit
-  depois não basta, o histórico e os forks continuam com ela).
-- Use uma **senha de aplicativo** (ou conta de serviço) dedicada a este envio, nunca a senha pessoal.
-- A interface escuta só em `127.0.0.1`, exige um token por execução e aceita só requisições locais,
-  para que outro site aberto no navegador não consiga disparar e-mails. Não exponha a porta na rede.
-- A tela recusa arquivos que não sejam PDF/XML de verdade.
+- **Nenhuma senha passa pelo programa.** O login é feito pela Microsoft (OAuth 2.0); o programa guarda só
+  um token, criptografado pelo Windows para o seu usuário, em `%LOCALAPPDATA%\EnviadorEmails\token_cache.bin`.
+- **Para e Cco** ficam em `%APPDATA%\EnviadorEmails\config.json`, fora do programa e do repositório.
+- Assunto e corpo são fixos no código (`core/modelo.py`) e só mudam com uma nova versão.
+- Conexão sempre com TLS. Nenhuma porta é aberta no computador.
+- A atualização automática só instala o `.exe` novo se o SHA-256 bater com o publicado na Release.
 
-## Uso com interface (recomendado)
+## Pré-requisitos no Microsoft 365 (uma vez, pela TI)
 
-```bash
-python app.py
+1. **Entra ID → Registros de aplicativo → Novo registro**: tipo de conta "somente este diretório".
+2. **Autenticação**: adicionar plataforma "Aplicativos móveis e da área de trabalho" com o URI
+   `http://localhost` e ativar "Permitir fluxos de cliente público".
+3. **Permissões de API**: Office 365 Exchange Online → permissão delegada `SMTP.Send` → conceder consentimento.
+4. Copiar o **ID do aplicativo (cliente)** e o **ID do diretório (locatário)** para `CLIENT_ID` e `TENANT_ID`
+   em `core/modelo.py` e lançar uma versão.
+5. Nas caixas que vão enviar: **SMTP autenticado** habilitado (Exchange → Caixa de correio → E-mail → Aplicativos de e-mail).
+
+Sem os IDs, o programa abre, mas o login avisa "Fale com a TI".
+
+## Atualização automática
+
+Ao abrir, o programa consulta a última Release no GitHub. Se houver versão nova, aparece o aviso
+**Nova versão disponível**: em **Atualizar** ele baixa o novo `.exe`, confere o SHA-256 e reabre já atualizado.
+Sem internet, nada aparece. Se um envio estiver em andamento, o aviso espera ele terminar.
+
+## Desenvolver
+
+```
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+python main.py
+python -m pytest
 ```
 
-Abra <http://127.0.0.1:5055>, arraste os PDFs e XMLs, confira os pares, escolha o **Vencimento**
-e clique em **Enviar e-mails**.
-A tela só aceita conexões do próprio computador (127.0.0.1).
+Modo terminal (usa a conta e o Para/Cco salvos pelo programa):
 
-## Uso por linha de comando
-
-Coloque os arquivos na pasta `entrada/`:
-
-```bash
-python enviar_emails.py --vcto 20/11/2026 --dry-run   # só lista os assuntos
-python enviar_emails.py --vcto 20/11/2026             # envia
+```
+python -m core "C:\Pasta" --vcto 20/11/2026 --dry-run
+python -m core "C:\Pasta" --vcto 20/11/2026 [--cco copia@empresa.com.br]
 ```
 
-Enviados vão para `enviados/`, falhas para `erros/`, arquivos sem par ficam em `entrada/`.
+## Lançar uma versão
+
+```
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+O GitHub Actions roda os testes, gera o `.exe` e publica na Release (`.github/workflows/release.yml`).
+A versão exibida no app vem da tag.
 
 ## Estrutura
 
-| Arquivo | Função |
+| Pasta/arquivo | Conteúdo |
 |---|---|
-| `enviador.py` | Lógica de envio (SMTP, montagem da mensagem) |
-| `app.py` + `templates/index.html` | Interface web local |
-| `enviar_emails.py` | Modo linha de comando por pasta |
-| `configurar_senha.py` | Guarda/remove a senha SMTP no cofre do sistema |
-| `config.exemplo.ini` | Modelo de configuração (sem senha) |
-| `corpo.html` / `corpo.txt` | Corpo fixo do e-mail (HTML e texto simples) |
+| `core/modelo.py` | Assunto, corpo, SMTP e IDs do registro Microsoft (fixos) |
+| `core/envio.py` | Pares, validação, mensagem, SMTP (XOAUTH2), envio do lote, movimentação |
+| `core/conta.py` | Login Microsoft (MSAL) e cache criptografado do token |
+| `core/configuracao.py` | Para e Cco do usuário (`config.json`) |
+| `core/worker.py` | Login e envio em segundo plano para a janela |
+| `core/cli.py` | Modo terminal (`python -m core`) |
+| `core/atualizacao.py` | Busca, download e instalação de nova versão |
+| `ui/` | Design System (tokens, QSS, componentes, ícones), modal de conta e de atualização |
+| `main.py` | Aplicação |
+| `EnviadorEmails.spec` | Configuração do PyInstaller |
+| `tests/` | Testes (`python -m pytest`) |

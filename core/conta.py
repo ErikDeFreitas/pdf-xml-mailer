@@ -31,15 +31,21 @@ def _criar_app():
             "O login Microsoft ainda não foi configurado nesta versão (CLIENT_ID/TENANT_ID)."
         )
     import msal
+
+    return msal.PublicClientApplication(
+        modelo.CLIENT_ID,
+        authority=f"https://login.microsoftonline.com/{modelo.TENANT_ID}",
+        token_cache=_criar_cache(),
+    )
+
+
+def _criar_cache():
+    """Cache de tokens do MSAL gravado em disco criptografado com DPAPI (por usuário do Windows)."""
     from msal_extensions import PersistedTokenCache, build_encrypted_persistence
 
     cache = caminho_cache()
     cache.parent.mkdir(parents=True, exist_ok=True)
-    return msal.PublicClientApplication(
-        modelo.CLIENT_ID,
-        authority=f"https://login.microsoftonline.com/{modelo.TENANT_ID}",
-        token_cache=PersistedTokenCache(build_encrypted_persistence(str(cache))),
-    )
+    return PersistedTokenCache(build_encrypted_persistence(str(cache)))
 
 
 class Conta:

@@ -1,0 +1,15 @@
+# Nada sensível no grafo: documentos reais, configuração local, tokens e build.
+*.pdf
+*.xml
+entrada/
+enviados/
+erros/
+config.ini
+config.json
+token_cache.bin
+.env
+*.env
+dist/
+build/
+.superpowers/
+assets/
