@@ -16,11 +16,14 @@ from ui import components as c
 
 class ContaModal(c.Modal):
     def __init__(self, conta, cfg: Configuracao | None, parent=None, caminho_config: Path | None = None,
-                 primeiro_acesso: bool = False):
+                 primeiro_acesso: bool = False, sessao_expirada: bool = False):
         super().__init__("Bem-vindo! Configure o envio" if primeiro_acesso else "Conta e destino",
                          "Entre com a sua conta Microsoft e informe para quem os e-mails vão.",
                          "settings", "primary", parent)
         self._conta = conta
+        # Sessão expirada: a conta ainda aparece no cache, mas o token não renova.
+        # Força "Entrar com a Microsoft" até um login novo dar certo.
+        self._precisa_login = sessao_expirada
         self._caminho = caminho_config
         self._thread: QThread | None = None
         self.resultado: Configuracao | None = None
@@ -59,12 +62,15 @@ class ContaModal(c.Modal):
 
     # ------------------------------------------------------------------
     def _email(self) -> str | None:
-        return self._conta.email() if self._conta is not None else None
+        if self._conta is None or self._precisa_login:
+            return None
+        return self._conta.email()
 
     def _atualizar(self) -> None:
         email = self._email()
         logado = bool(email)
-        self.rotulo_conta.setText(email or "Nenhuma conta conectada")
+        texto = "Sua sessão expirou. Entre novamente." if self._precisa_login else "Nenhuma conta conectada"
+        self.rotulo_conta.setText(email or texto)
         self.botao_sair.setVisible(logado)
         self.botao_entrar.setVisible(not logado)
         self.botao_entrar.setEnabled(self._conta is not None and self._thread is None)
@@ -89,6 +95,7 @@ class ContaModal(c.Modal):
         self._thread.start()
 
     def _fim_login(self, _email: str) -> None:
+        self._precisa_login = False
         self.botao_entrar.setText("Entrar com a Microsoft")
 
     def _falha_login(self, mensagem: str) -> None:

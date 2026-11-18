@@ -82,3 +82,12 @@ def test_resultado_atualiza_status_e_limpar(janela, tmp_path):
     pagina.limpar()
     assert pagina.tabela.rowCount() == 0
     assert pagina.botao_enviar.text() == "Enviar"
+
+
+def test_enviado_com_aviso_nao_fica_pendente(janela, tmp_path):
+    _, lista = arquivos(tmp_path)
+    pagina = janela.pagina
+    pagina.adicionar(lista)
+    pagina._ao_concluir_par(envio.ResultadoPar("1", "aviso", "não foi movido"))
+    pagina._ao_terminar_thread()
+    assert [p.nome for p in pagina._pares] == ["2"]

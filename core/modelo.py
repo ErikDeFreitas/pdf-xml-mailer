@@ -35,3 +35,15 @@ INTERVALO_SEGUNDOS = 2.0
 CLIENT_ID = ""
 TENANT_ID = ""
 ESCOPOS = ["https://outlook.office.com/SMTP.Send"]
+
+
+def pendencias_release() -> list[str]:
+    """O que ainda impede uma release (o workflow falha se a lista não estiver vazia)."""
+    faltando = []
+    if not CLIENT_ID:
+        faltando.append("CLIENT_ID vazio em core/modelo.py")
+    if not TENANT_ID:
+        faltando.append("TENANT_ID vazio em core/modelo.py")
+    if "TEXTO FIXO" in ASSUNTO:
+        faltando.append("ASSUNTO ainda é o texto de exemplo em core/modelo.py")
+    return faltando

@@ -230,8 +230,9 @@ class EnviarPage(c.Page):
                       tone="danger" if self._status.get(nome) == "Erro" else "warning")
 
     # --- Envio ----------------------------------------------------------
-    def abrir_configuracoes(self, primeiro_acesso: bool = False) -> bool:
-        modal = ContaModal(self.conta, self.cfg, self.window(), self.caminho_config, primeiro_acesso)
+    def abrir_configuracoes(self, primeiro_acesso: bool = False, sessao_expirada: bool = False) -> bool:
+        modal = ContaModal(self.conta, self.cfg, self.window(), self.caminho_config, primeiro_acesso,
+                           sessao_expirada)
         aceito = modal.exec() == ContaModal.DialogCode.Accepted
         self.recarregar_conta()
         return aceito
@@ -338,14 +339,17 @@ class EnviarPage(c.Page):
     def _ao_expirar(self, mensagem: str) -> None:
         self.progresso.hide()
         self.lbl_resumo.setText(mensagem)
-        QTimer.singleShot(0, self.abrir_configuracoes)
+        QTimer.singleShot(0, lambda: self.abrir_configuracoes(sessao_expirada=True))
 
     def _ao_terminar_thread(self) -> None:
         self._thread = None
         self._worker = None
-        # Pares que saíram da pasta (enviados/ ou erros/) não podem ser reenviados; a tabela fica
-        # como está até "Limpar", e só o que continua no lugar (ex.: conexão caiu) segue pendente.
-        self._pares = [p for p in self._pares if p.pdf.exists() and p.xml.exists()]
+        # Só segue pendente o par que NÃO saiu e continua no lugar (ex.: conexão caiu). Enviado ou
+        # enviado com aviso (arquivo preso, não movido) nunca volta para a fila: evita e-mail duplicado.
+        # A tabela fica como está até "Limpar".
+        saiu = {r.nome for r in self._resultados if r.status in ("enviado", "aviso")}
+        self._pares = [p for p in self._pares
+                       if p.nome not in saiu and p.pdf.exists() and p.xml.exists()]
         self._arquivos = {k: v for k, v in self._arquivos.items() if v.exists()}
         self._set_rodando(False)
 

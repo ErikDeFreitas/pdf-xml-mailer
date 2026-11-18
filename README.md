@@ -83,6 +83,8 @@ git push origin v1.1.0
 ```
 
 O GitHub Actions roda os testes, gera o `.exe` e publica na Release (`.github/workflows/release.yml`).
+Antes, ele confere `core/modelo.py`: a release **falha** se `CLIENT_ID`/`TENANT_ID` estiverem vazios
+ou se o `ASSUNTO` ainda for o texto de exemplo.
 A versão exibida no app vem da tag.
 
 ## Estrutura

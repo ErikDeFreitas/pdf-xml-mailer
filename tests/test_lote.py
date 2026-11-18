@@ -158,3 +158,61 @@ def test_lote_reconexao_falha_marca_restantes(tmp_path):
     r = lote(lista, conectar)
     assert [x.status for x in r] == ["erro", "erro"]
     assert all(p.pdf.exists() for p in lista)
+
+
+# --- Correções da revisão final -------------------------------------------
+
+def test_mover_par_preso_nao_deixa_copia(tmp_path, monkeypatch):
+    par = pares(tmp_path, "1")[0]
+
+    def rename_preso(origem, destino):
+        raise PermissionError("em uso")
+
+    monkeypatch.setattr(envio.os, "rename", rename_preso)
+    with pytest.raises(PermissionError):
+        envio.mover_par(par, True)
+    assert not list((tmp_path / "enviados").glob("*"))
+    assert par.pdf.exists()
+
+
+def test_lote_aviso_diz_para_nao_reenviar(tmp_path, monkeypatch):
+    monkeypatch.setattr(envio, "mover_par", lambda par, s: (_ for _ in ()).throw(PermissionError("em uso")))
+    r = lote(pares(tmp_path, "1"), lambda: FakeSMTP())
+    assert "não envie de novo" in r[0].detalhe
+
+
+class SMTPComErro(FakeSMTP):
+    def __init__(self, erro):
+        super().__init__()
+        self.erro = erro
+
+    def send_message(self, msg):
+        raise self.erro
+
+
+def test_lote_timeout_para_sem_mover(tmp_path):
+    lista = pares(tmp_path, "1", "2")
+    r = lote(lista, lambda: SMTPComErro(TimeoutError("timed out")))
+    assert [x.status for x in r] == ["erro", "erro"]
+    assert "confira" in r[0].detalhe.lower()
+    assert all(p.pdf.exists() for p in lista)
+    assert not (tmp_path / "erros").exists()
+
+
+def test_lote_recusa_smtp_vai_para_erros(tmp_path):
+    erro = smtplib.SMTPRecipientsRefused({"a@b.com": (550, b"nao")})
+    r = lote(pares(tmp_path, "1"), lambda: SMTPComErro(erro))
+    assert r[0].status == "erro"
+    assert (tmp_path / "erros" / "1.pdf").exists()
+
+
+def test_lote_recusa_parcial_vira_aviso(tmp_path):
+    class Parcial(FakeSMTP):
+        def send_message(self, msg):
+            super().send_message(msg)
+            return {"x@y.com": (550, b"nao existe")}
+
+    r = lote(pares(tmp_path, "1"), lambda: Parcial())
+    assert r[0].status == "aviso"
+    assert "x@y.com" in r[0].detalhe
+    assert (tmp_path / "enviados" / "1.pdf").exists()

@@ -38,6 +38,10 @@ jobs:
           Set-Content -Path version.py -Value "__version__ = `"$versao`"" -Encoding utf8
           Write-Host "Versão: $versao"
 
+      - name: Conferir valores fixos (login Microsoft e assunto)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: python -c "import sys; from core.modelo import pendencias_release as p; f = p(); print(*f, sep='; '); sys.exit(1 if f else 0)"
+
       - name: Testes (inclui abrir a janela)
         env:
           QT_QPA_PLATFORM: offscreen

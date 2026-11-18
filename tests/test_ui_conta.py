@@ -80,3 +80,10 @@ def test_sem_conta_configurada_desabilita_login(tmp_path):
     m = modal(None, caminho=tmp_path / "c.json")
     assert not m.botao_entrar.isEnabled()
     assert not m.botao_salvar.isEnabled()
+
+
+def test_sessao_expirada_mostra_entrar(tmp_path):
+    from ui.conta import ContaModal
+    m = ContaModal(FakeConta("eu@tcm.com"), None, caminho_config=tmp_path / "c.json", sessao_expirada=True)
+    assert not m.botao_entrar.isHidden()
+    assert not m.botao_salvar.isEnabled()

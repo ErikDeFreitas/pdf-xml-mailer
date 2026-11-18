@@ -10,6 +10,7 @@ from pathlib import Path
 
 from core import modelo
 
+TEMPO_LOGIN = 180  # segundos esperando o login no navegador
 
 class ContaNaoConfigurada(Exception):
     """CLIENT_ID/TENANT_ID ainda não preenchidos em core/modelo.py."""
@@ -61,7 +62,9 @@ class Conta:
         return conta.get("username") if conta else None
 
     def entrar(self) -> str:
-        resultado = self._app.acquire_token_interactive(modelo.ESCOPOS, prompt="select_account")
+        # timeout: se a pessoa fechar o navegador sem logar, o app não fica preso esperando.
+        resultado = self._app.acquire_token_interactive(modelo.ESCOPOS, prompt="select_account",
+                                                        timeout=TEMPO_LOGIN)
         if not resultado or "access_token" not in resultado:
             descricao = (resultado or {}).get("error_description") or "Login cancelado."
             raise FalhaLogin(descricao)

@@ -86,3 +86,23 @@ def test_cache_de_token_criptografado_funciona(tmp_path, monkeypatch):
     arquivo = conta_mod.caminho_cache()
     assert arquivo.exists()
     assert b"SEGREDO" not in arquivo.read_bytes()  # DPAPI: nada em texto puro
+
+
+def test_entrar_tem_timeout():
+    app = FakeApp(interativo={"access_token": "T", "email": "eu@tcm.com"})
+    chamadas = []
+    original = app.acquire_token_interactive
+    app.acquire_token_interactive = lambda scopes, **kw: chamadas.append(kw) or original(scopes, **kw)
+    Conta(app).entrar()
+    assert chamadas[0].get("timeout") == 180
+
+
+def test_pendencias_release(monkeypatch):
+    monkeypatch.setattr(modelo, "CLIENT_ID", "")
+    monkeypatch.setattr(modelo, "TENANT_ID", "")
+    monkeypatch.setattr(modelo, "ASSUNTO", "EMPRESA - CTE {nome} - TEXTO FIXO DO ASSUNTO")
+    assert len(modelo.pendencias_release()) == 3
+    monkeypatch.setattr(modelo, "CLIENT_ID", "id")
+    monkeypatch.setattr(modelo, "TENANT_ID", "tenant")
+    monkeypatch.setattr(modelo, "ASSUNTO", "TCM - CTE {nome}")
+    assert modelo.pendencias_release() == []

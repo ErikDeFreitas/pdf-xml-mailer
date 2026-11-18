@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import html as html_lib
+import os
 import re
-import shutil
 import smtplib
 import ssl
 import time
@@ -128,11 +128,13 @@ def destino_livre(pasta: Path, nome_arquivo: str) -> Path:
 
 def mover_par(par: Par, sucesso: bool) -> None:
     """Move o PDF e o XML para enviados/ (ou erros/) dentro da pasta de cada um."""
+    # os.rename (mesmo disco: é uma subpasta) e não shutil.move: com o arquivo aberto em outro
+    # programa, o shutil copiaria e falharia ao apagar, deixando uma cópia em enviados/ E o original.
     sub = PASTA_ENVIADOS if sucesso else PASTA_ERROS
     for arq in (par.pdf, par.xml):
         pasta = arq.parent / sub
         pasta.mkdir(exist_ok=True)
-        shutil.move(str(arq), str(destino_livre(pasta, arq.name)))
+        os.rename(arq, destino_livre(pasta, arq.name))
 
 
 # ---------------------------------------------------------------------------
@@ -215,33 +217,52 @@ def enviar_lote(pares: list[Par], remetente: str, para: list[str], cco: list[str
                 continue
 
             mensagem = montar_mensagem(par, remetente, para, cco, vcto, dados_pdf, dados_xml)
-            perdida = None
+            perdida = incerto = None
+            recusados = {}
             try:
-                server.send_message(mensagem)
+                recusados = server.send_message(mensagem) or {}
             except _QUEDA:
                 # Caiu: reconecta uma vez e repete este par. Falhou de novo -> para o lote
                 # sem mover nada (os arquivos ficam para um novo envio).
                 _fechar(server)
                 try:
                     server = conectar()
-                    server.send_message(mensagem)
+                    recusados = server.send_message(mensagem) or {}
                 except Exception as e:  # noqa: BLE001
                     perdida = e
+            except smtplib.SMTPException as e:  # recusa do servidor: este par não saiu
+                _mover_sem_falhar(par, False)
+                registrar(ResultadoPar(par.nome, "erro", str(e)))
+                continue
+            except OSError as e:
+                # Timeout/TLS: não dá para saber se o e-mail saiu. Não move nada e para o lote.
+                incerto = e
             except Exception as e:  # noqa: BLE001
                 _mover_sem_falhar(par, False)
                 registrar(ResultadoPar(par.nome, "erro", str(e)))
                 continue
+            if incerto is not None:
+                registrar(ResultadoPar(par.nome, "erro",
+                                       f"Sem resposta do servidor ({incerto}). O e-mail pode ter saído: "
+                                       "confira na pasta Itens Enviados antes de reenviar."))
+                for resto in pares[i + 1:]:
+                    registrar(ResultadoPar(resto.nome, "erro", "Não enviado: o lote parou por falta de resposta do servidor"))
+                break
             if perdida is not None:
                 for resto in pares[i:]:
                     registrar(ResultadoPar(resto.nome, "erro", f"Conexão perdida com o servidor ({perdida})"))
                 break
 
+            avisos = []
+            if recusados:
+                avisos.append("Destinatário(s) recusado(s): " + ", ".join(sorted(recusados)))
             try:
                 mover_par(par, True)
             except OSError as e:
-                registrar(ResultadoPar(par.nome, "aviso", f"Enviado, mas não foi movido para enviados/: {e}"))
-            else:
-                registrar(ResultadoPar(par.nome, "enviado"))
+                avisos.append(f"Enviado, mas não foi movido para enviados/ ({e}). "
+                              "O arquivo continua na pasta: não envie de novo.")
+            registrar(ResultadoPar(par.nome, "aviso", " ".join(avisos)) if avisos
+                      else ResultadoPar(par.nome, "enviado"))
     finally:
         _fechar(server)
     return resultados
