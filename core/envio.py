@@ -4,11 +4,14 @@ from __future__ import annotations
 import html as html_lib
 import re
 import shutil
+import smtplib
+import ssl
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from email.message import EmailMessage
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
 from core import modelo
 
@@ -130,3 +133,122 @@ def mover_par(par: Par, sucesso: bool) -> None:
         pasta = arq.parent / sub
         pasta.mkdir(exist_ok=True)
         shutil.move(str(arq), str(destino_livre(pasta, arq.name)))
+
+
+# ---------------------------------------------------------------------------
+# Conexão (XOAUTH2) e envio do lote
+# ---------------------------------------------------------------------------
+
+class FalhaConexao(Exception):
+    """Não deu para conectar/autenticar no servidor. Nenhum arquivo foi movido."""
+
+
+@dataclass
+class ResultadoPar:
+    nome: str
+    status: str  # "enviado" | "aviso" | "erro"
+    detalhe: str = ""
+
+
+_QUEDA = (smtplib.SMTPServerDisconnected, ConnectionError)
+
+
+def xoauth2(email: str, token: str) -> str:
+    return f"user={email}\x01auth=Bearer {token}\x01\x01"
+
+
+def abrir_smtp(email: str, token: str, fabrica=smtplib.SMTP) -> smtplib.SMTP:
+    server = fabrica(modelo.SMTP_HOST, modelo.SMTP_PORTA, timeout=modelo.TIMEOUT)
+    server.ehlo()
+    server.starttls(context=ssl.create_default_context())
+    server.ehlo()
+    server.auth("XOAUTH2", lambda _=None: xoauth2(email, token), initial_response_ok=True)
+    return server
+
+
+def _fechar(server) -> None:
+    try:
+        server.quit()
+    except Exception:  # noqa: BLE001 - conexão já caída
+        pass
+
+
+def enviar_lote(pares: list[Par], remetente: str, para: list[str], cco: list[str], vcto: str,
+                conectar: Callable[[], smtplib.SMTP],
+                intervalo: float = modelo.INTERVALO_SEGUNDOS,
+                ao_iniciar: Callable[[int, int, str], None] | None = None,
+                ao_concluir: Callable[[ResultadoPar], None] | None = None,
+                cancelado: Callable[[], bool] = lambda: False,
+                dormir: Callable[[float], None] = time.sleep) -> list[ResultadoPar]:
+    """Envia um e-mail por par numa única conexão. Um erro num par nunca derruba o lote."""
+    vcto = validar_vcto(vcto)
+    try:
+        server = conectar()
+    except Exception as e:  # noqa: BLE001
+        raise FalhaConexao(f"Não foi possível conectar ao servidor de e-mail: {e}") from e
+
+    resultados: list[ResultadoPar] = []
+
+    def registrar(r: ResultadoPar) -> None:
+        resultados.append(r)
+        if ao_concluir:
+            ao_concluir(r)
+
+    try:
+        for i, par in enumerate(pares):
+            if cancelado():
+                break
+            if i:
+                dormir(intervalo)
+            if ao_iniciar:
+                ao_iniciar(i + 1, len(pares), par.nome)
+            try:
+                dados_pdf, dados_xml = par.pdf.read_bytes(), par.xml.read_bytes()
+            except OSError as e:
+                registrar(ResultadoPar(par.nome, "erro", f"Não foi possível ler os arquivos: {e}"))
+                continue
+            invalido = (f"{par.pdf.name} não parece ser um PDF válido" if not pdf_valido(dados_pdf) else
+                        f"{par.xml.name} não parece ser um XML válido" if not xml_valido(dados_xml) else "")
+            if invalido:
+                _mover_sem_falhar(par, False)
+                registrar(ResultadoPar(par.nome, "erro", invalido))
+                continue
+
+            mensagem = montar_mensagem(par, remetente, para, cco, vcto, dados_pdf, dados_xml)
+            perdida = None
+            try:
+                server.send_message(mensagem)
+            except _QUEDA:
+                # Caiu: reconecta uma vez e repete este par. Falhou de novo -> para o lote
+                # sem mover nada (os arquivos ficam para um novo envio).
+                _fechar(server)
+                try:
+                    server = conectar()
+                    server.send_message(mensagem)
+                except Exception as e:  # noqa: BLE001
+                    perdida = e
+            except Exception as e:  # noqa: BLE001
+                _mover_sem_falhar(par, False)
+                registrar(ResultadoPar(par.nome, "erro", str(e)))
+                continue
+            if perdida is not None:
+                for resto in pares[i:]:
+                    registrar(ResultadoPar(resto.nome, "erro", f"Conexão perdida com o servidor ({perdida})"))
+                break
+
+            try:
+                mover_par(par, True)
+            except OSError as e:
+                registrar(ResultadoPar(par.nome, "aviso", f"Enviado, mas não foi movido para enviados/: {e}"))
+            else:
+                registrar(ResultadoPar(par.nome, "enviado"))
+    finally:
+        _fechar(server)
+    return resultados
+
+
+def _mover_sem_falhar(par: Par, sucesso: bool) -> None:
+    try:
+        mover_par(par, sucesso)
+    except OSError:
+        pass
