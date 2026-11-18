@@ -35,9 +35,17 @@ def arquivos(tmp_path):
 
 def test_janela_abre(janela):
     pagina = janela.pagina
-    assert pagina.campo_cco.text() == "x@y.com"
     assert "a@b.com" in pagina.lbl_para.text()
+    assert "x@y.com" in pagina.lbl_para.text()  # Cco só é exibido; edição só em Configurações
     assert "eu@tcm.com" in pagina.lbl_conta.text()
+    assert not hasattr(pagina, "campo_cco")
+
+
+def test_botoes_de_envio(janela):
+    pagina = janela.pagina
+    assert pagina.btn_pasta.parent() is pagina.botao_enviar.parent()  # lado a lado no card Envio
+    assert pagina.btn_pasta.property("variant") == "primary"         # azul
+    assert pagina.botao_enviar.property("variant") == "danger"       # vermelho
 
 
 def test_adicionar_monta_pares(janela, tmp_path):

@@ -38,7 +38,7 @@ Para cada par **PDF + XML de mesmo nome** (nome sem extensão, ex.: `123814.pdf`
 3. **Login pela Microsoft (OAuth 2.0 / XOAUTH2 no SMTP)** em vez de senha.
 4. **Para e Cco** preenchidos no primeiro acesso, salvos num arquivo local e lidos dele a cada abertura
    (fora do código, então não ficam no repositório público).
-5. **Cco** opcional, também editável na tela principal, lembrando a última escolha.
+5. **Cco** opcional, definido **só em Configurações** (alterado em 2026-11-18: saiu da tela de envio, que apenas o exibe).
 6. **Mover para `enviados/` e `erros/`** após o envio.
 
 ## Abordagens consideradas

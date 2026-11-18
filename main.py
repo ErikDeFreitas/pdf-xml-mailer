@@ -68,8 +68,6 @@ class EnviarPage(c.Page):
         # --- Arquivos -------------------------------------------------------
         self.btn_arquivos = c.Button("Escolher arquivos", "secondary", icon="file-text")
         self.btn_arquivos.clicked.connect(self._escolher_arquivos)
-        self.btn_pasta = c.Button("Escolher pasta", "secondary", icon="folder-open")
-        self.btn_pasta.clicked.connect(self._escolher_pasta)
         self.btn_limpar = c.Button("Limpar", "ghost", icon="eraser")
         self.btn_limpar.clicked.connect(self.limpar)
         self.tabela = c.DataTable(["Nome", "PDF", "XML", "Status"])
@@ -78,7 +76,7 @@ class EnviarPage(c.Page):
         self.tabela.cellClicked.connect(self._clique_linha)
         arquivos = c.Card("Arquivos", "Arraste PDFs, XMLs ou pastas para esta janela. "
                                       "Cada PDF precisa de um XML com o mesmo nome.")
-        arquivos.add(c.hbox(self.btn_arquivos, self.btn_pasta, None, self.btn_limpar, spacing=SPACE["sm"]),
+        arquivos.add(c.hbox(self.btn_arquivos, None, self.btn_limpar, spacing=SPACE["sm"]),
                      self.tabela)
 
         # --- Envio ----------------------------------------------------------
@@ -86,8 +84,6 @@ class EnviarPage(c.Page):
         self.campo_vcto.setInputMask("99/99/9999;_")
         self.campo_vcto.textChanged.connect(self._atualizar_botao)
         self.campo_vcto_field = c.FormField("Vencimento", self.campo_vcto, "Aparece no corpo do e-mail.")
-        self.campo_cco = c.Input("opcional")
-        self.campo_cco_field = c.FormField("Cco", self.campo_cco, "Cópia oculta. O último valor fica salvo.")
         self.lbl_assunto = c.Label("", "muted", wrap=True)
         self.lbl_resumo = c.Label("", "muted")
         self.progresso = c.ProgressBar()
@@ -95,14 +91,19 @@ class EnviarPage(c.Page):
         self.botao_cancelar = c.Button("Cancelar", "danger", icon="x")
         self.botao_cancelar.clicked.connect(self._cancelar)
         self.botao_cancelar.hide()
-        self.botao_enviar = c.Button("Enviar", "primary", icon="send")
+        # Design TCM: azul (primary) para escolher a pasta, vermelho (danger) para o envio, que
+        # não tem volta.
+        self.btn_pasta = c.Button("Escolher pasta", "primary", icon="folder-open")
+        self.btn_pasta.clicked.connect(self._escolher_pasta)
+        self.botao_enviar = c.Button("Enviar", "danger", icon="send")
         self.botao_enviar.clicked.connect(self._enviar)
         envio_card = c.Card("Envio")
         envio_card.add(
-            c.hbox(self.campo_vcto_field, self.campo_cco_field, spacing=SPACE["lg"]),
+            self.campo_vcto_field,
             self.lbl_assunto,
             self.progresso,
-            c.hbox(self.lbl_resumo, None, self.botao_cancelar, self.botao_enviar, spacing=SPACE["sm"]),
+            c.hbox(self.lbl_resumo, None, self.botao_cancelar, self.btn_pasta, self.botao_enviar,
+                   spacing=SPACE["sm"]),
         )
 
         self.add(destino, envio_card, arquivos, stretch_last=True)
@@ -120,9 +121,10 @@ class EnviarPage(c.Page):
         self.cfg = configuracao.carregar(self.caminho_config)
         email = self.email()
         self.lbl_conta.setText(email or "Nenhuma conta conectada")
-        self.lbl_para.setText("Para: " + ("; ".join(self.cfg.para) if self.cfg else "não configurado"))
-        if self.cfg and not self.rodando:
-            self.campo_cco.setText("; ".join(self.cfg.cco))
+        texto = "Para: " + ("; ".join(self.cfg.para) if self.cfg else "não configurado")
+        if self.cfg and self.cfg.cco:
+            texto += "   ·   Cco: " + "; ".join(self.cfg.cco)
+        self.lbl_para.setText(texto)
         self.aviso_login.setText(
             "O login Microsoft ainda não foi configurado nesta versão. Fale com a TI."
             if self.conta is None else "")
@@ -246,20 +248,13 @@ class EnviarPage(c.Page):
         except ValueError as e:
             self.campo_vcto_field.set_error(str(e))
             return
-        try:
-            cco = envio.validar_emails(self.campo_cco.text(), False)
-            self.campo_cco_field.set_error(None)
-        except ValueError as e:
-            self.campo_cco_field.set_error(str(e))
-            return
+        cco = list(self.cfg.cco)  # definido só em Configurações
 
         n = len(self._pares)
         mensagem = f"Para: {'; '.join(self.cfg.para)}" + (f"\nCco: {'; '.join(cco)}" if cco else "")
         if not c.Modal.confirm(self, f"Enviar {_plural(n, 'e-mail', 'e-mails')}?", mensagem,
                                confirm_text="Enviar"):
             return
-        self.cfg.cco = cco
-        configuracao.salvar(self.cfg, self.caminho_config)
 
         self._resultados = []
         self.progresso.setRange(0, n)
@@ -287,7 +282,6 @@ class EnviarPage(c.Page):
         for w in (self.btn_arquivos, self.btn_pasta, self.btn_limpar, self.btn_config):
             w.setEnabled(not rodando)
         self.campo_vcto.setReadOnly(rodando)
-        self.campo_cco.setReadOnly(rodando)
         self.botao_cancelar.setVisible(rodando)
         self.botao_cancelar.setEnabled(True)
         self.botao_enviar.setVisible(not rodando)

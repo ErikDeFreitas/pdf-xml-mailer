@@ -45,7 +45,7 @@ class ContaModal(c.Modal):
         self.campo_cco = c.Input("opcional")
         self.campo_para_field = c.FormField("Para", self.campo_para, "Um ou mais e-mails separados por ;")
         self.campo_cco_field = c.FormField("Cco (opcional)", self.campo_cco,
-                                           "Cópia oculta. Também pode ser trocado na tela de envio.")
+                                           "Cópia oculta, usada em todos os envios.")
         self.body.addWidget(self.campo_para_field)
         self.body.addWidget(self.campo_cco_field)
         if cfg:

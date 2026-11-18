@@ -11,10 +11,10 @@ Baixe o `EnviadorEmails.exe` da última [Release](../../releases/latest) e abra.
 houver) e informe **Para** (obrigatório) e **Cco** (opcional). Para trocar depois: **Configurações**.
 
 **Enviar:**
-1. Arraste PDFs, XMLs ou pastas para a janela (ou use **Escolher arquivos** / **Escolher pasta**).
+1. Arraste PDFs, XMLs ou pastas para a janela (ou use **Escolher pasta**, ao lado do Enviar, ou **Escolher arquivos**).
 2. Confira os pares na tabela. Arquivo sem par aparece como aviso e não é enviado.
-3. Informe o **Vencimento** (dd/mm/aaaa) e, se quiser, ajuste o **Cco** (o último valor fica salvo).
-4. Clique em **Enviar N e-mails** e confirme.
+3. Informe o **Vencimento** (dd/mm/aaaa).
+4. Clique em **Enviar N e-mails** (vermelho) e confirme. O Cco é o definido em **Configurações**.
 
 Cada linha mostra o andamento: Enviando, Enviado, Enviado com aviso ou Erro (clique para ver o motivo).
 
