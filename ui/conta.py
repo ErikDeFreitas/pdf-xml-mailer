@@ -4,9 +4,8 @@ Login Microsoft (no navegador, numa QThread) + Para (obrigatório) e Cco (opcion
 """
 from __future__ import annotations
 
+import threading
 from pathlib import Path
-
-from PySide6.QtCore import QThread
 
 from core import configuracao, envio
 from core.configuracao import Configuracao
@@ -25,7 +24,9 @@ class ContaModal(c.Modal):
         # Força "Entrar com a Microsoft" até um login novo dar certo.
         self._precisa_login = sessao_expirada
         self._caminho = caminho_config
-        self._thread: QThread | None = None
+        # Login em andamento. Roda numa thread daemon: se a Microsoft parar numa página de erro,
+        # o MSAL só desiste no tempo limite, e a pessoa precisa poder fechar o modal antes disso.
+        self._worker: LoginWorker | None = None
         self.resultado: Configuracao | None = None
 
         # Conta
@@ -73,7 +74,7 @@ class ContaModal(c.Modal):
         self.rotulo_conta.setText(email or texto)
         self.botao_sair.setVisible(logado)
         self.botao_entrar.setVisible(not logado)
-        self.botao_entrar.setEnabled(self._conta is not None and self._thread is None)
+        self.botao_entrar.setEnabled(self._conta is not None and self._worker is None)
         self.botao_salvar.setEnabled(logado)
         if self._conta is None:
             self.aviso.setText("O login Microsoft ainda não foi configurado nesta versão. Fale com a TI.")
@@ -82,29 +83,38 @@ class ContaModal(c.Modal):
     def _entrar(self) -> None:
         self.aviso.setText("")
         self.botao_entrar.setText("Aguardando login no navegador…")
-        self._thread = QThread(self)
-        self._worker = LoginWorker(self._conta)
-        self._worker.moveToThread(self._thread)
-        self._thread.started.connect(self._worker.run)
-        self._worker.concluido.connect(self._fim_login)
-        self._worker.falhou.connect(self._falha_login)
-        self._worker.concluido.connect(self._thread.quit)
-        self._worker.falhou.connect(self._thread.quit)
-        self._thread.finished.connect(self._thread_terminou)
+        self.aviso.setText("Se o navegador mostrar um erro, feche esta janela ou clique em Cancelar.")
+        worker = LoginWorker(self._conta)
+        worker.concluido.connect(self._fim_login)  # entregue na thread da interface (fila do Qt)
+        worker.falhou.connect(self._falha_login)
+        self._worker = worker
         self._atualizar()
-        self._thread.start()
+        threading.Thread(target=worker.run, name="login-microsoft", daemon=True).start()
 
     def _fim_login(self, _email: str) -> None:
         self._precisa_login = False
-        self.botao_entrar.setText("Entrar com a Microsoft")
+        self.aviso.setText("")
+        self._login_terminou()
 
     def _falha_login(self, mensagem: str) -> None:
-        self.botao_entrar.setText("Entrar com a Microsoft")
         self.aviso.setText(mensagem)
+        self._login_terminou()
 
-    def _thread_terminou(self) -> None:
-        self._thread = None
+    def _login_terminou(self) -> None:
+        self._worker = None
+        self.botao_entrar.setText("Entrar com a Microsoft")
         self._atualizar()
+
+    def _abandonar_login(self) -> None:
+        """Solta o login em andamento: a thread termina sozinha no tempo limite e ninguém a escuta."""
+        if self._worker is None:
+            return
+        for sinal in (self._worker.concluido, self._worker.falhou):
+            try:
+                sinal.disconnect()
+            except (RuntimeError, TypeError):
+                pass
+        self._login_terminou()
 
     def _sair(self) -> None:
         if self._conta is not None:
@@ -133,11 +143,6 @@ class ContaModal(c.Modal):
         configuracao.salvar(self.resultado, self._caminho)
         self.accept()
 
-    def reject(self) -> None:  # não fecha no meio do login
-        if self._thread is None:
-            super().reject()
-
     def done(self, r: int) -> None:  # noqa: D401
-        if self._thread is not None and self._thread.isRunning():
-            return
+        self._abandonar_login()  # X, Cancelar ou Esc fecham mesmo com o login aberto no navegador
         super().done(r)

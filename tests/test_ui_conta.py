@@ -87,3 +87,69 @@ def test_sessao_expirada_mostra_entrar(tmp_path):
     m = ContaModal(FakeConta("eu@tcm.com"), None, caminho_config=tmp_path / "c.json", sessao_expirada=True)
     assert not m.botao_entrar.isHidden()
     assert not m.botao_salvar.isEnabled()
+
+
+class ContaTravada(FakeConta):
+    """Login que nunca volta sozinho: como o navegador parado numa página de erro da Microsoft."""
+
+    def __init__(self):
+        super().__init__()
+        import threading
+        self.liberar = threading.Event()
+
+    def entrar(self):
+        self.liberar.wait(5)
+        return super().entrar()
+
+
+def test_cancelar_fecha_durante_login_travado(tmp_path):
+    import time
+    conta = ContaTravada()
+    m = modal(conta, caminho=tmp_path / "c.json")
+    fechou = []
+    m.finished.connect(fechou.append)
+    m.open()
+    m.botao_entrar.click()
+    m.reject()  # X ou Cancelar
+    try:
+        assert fechou == [QDialog.DialogCode.Rejected]
+        assert not m.isVisible()
+        assert m.resultado is None
+    finally:
+        conta.liberar.set()
+    # o login abandonado termina depois sem quebrar nada
+    fim = time.monotonic() + 2
+    while time.monotonic() < fim:
+        QApplication.processEvents()
+        time.sleep(0.01)
+    assert fechou == [QDialog.DialogCode.Rejected]
+
+
+def _esperar(condicao, segundos=3):
+    import time
+    fim = time.monotonic() + segundos
+    while not condicao() and time.monotonic() < fim:
+        QApplication.processEvents()
+        time.sleep(0.01)
+    return condicao()
+
+
+def test_login_em_segundo_plano_habilita_salvar(tmp_path):
+    m = modal(FakeConta(), caminho=tmp_path / "c.json")
+    m.botao_entrar.click()
+    assert _esperar(m.botao_salvar.isEnabled)
+    assert "eu@tcm.com" in m.rotulo_conta.text()
+    assert m.botao_entrar.isEnabled() or m.botao_entrar.isHidden()
+
+
+def test_falha_no_login_mostra_motivo_e_permite_tentar_de_novo(tmp_path):
+    from core.conta import FalhaLogin
+
+    class ContaComErro(FakeConta):
+        def entrar(self):
+            raise FalhaLogin("AADSTS500113: No reply address")
+
+    m = modal(ContaComErro(), caminho=tmp_path / "c.json")
+    m.botao_entrar.click()
+    assert _esperar(lambda: "AADSTS500113" in m.aviso.text())
+    assert m.botao_entrar.isEnabled()
