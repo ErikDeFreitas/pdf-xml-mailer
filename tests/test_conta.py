@@ -100,9 +100,8 @@ def test_entrar_tem_timeout():
 def test_pendencias_release(monkeypatch):
     monkeypatch.setattr(modelo, "CLIENT_ID", "")
     monkeypatch.setattr(modelo, "TENANT_ID", "")
-    monkeypatch.setattr(modelo, "ASSUNTO", "EMPRESA - CTE {nome} - TEXTO FIXO DO ASSUNTO")
-    assert len(modelo.pendencias_release()) == 3
+    assert len(modelo.pendencias_release()) == 2
     monkeypatch.setattr(modelo, "CLIENT_ID", "id")
     monkeypatch.setattr(modelo, "TENANT_ID", "tenant")
-    monkeypatch.setattr(modelo, "ASSUNTO", "TCM - CTE {nome}")
+    # o assunto de exemplo não barra a release: cada pessoa configura em "Configurar e-mail"
     assert modelo.pendencias_release() == []

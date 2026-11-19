@@ -1,7 +1,7 @@
 # Enviador de PDF + XML
 
 Envia **um e-mail para cada par PDF + XML de mesmo nome** (ex.: `123814.pdf` + `123814.xml`),
-com os dois arquivos anexados. O assunto usa o nome do par e o corpo leva a data de vencimento.
+com os dois arquivos anexados. O assunto e o corpo são configuráveis e podem usar o nome do par e a data de vencimento.
 
 ## Usar
 
@@ -9,6 +9,10 @@ Baixe o `EnviadorEmails.exe` da última [Release](../../releases/latest) e abra.
 
 **Primeiro acesso:** clique em **Entrar com a Microsoft** (o login acontece no navegador, com MFA se
 houver) e informe **Para** (obrigatório) e **Cco** (opcional). Para trocar depois: **Configurações**.
+
+**Texto do e-mail:** clique em **Configurar e-mail** (card Envio) e edite o assunto e o corpo. Use `{nome}`
+para o nome do arquivo e `{vcto}` para o vencimento; `**texto**` sai em negrito. O que você salvar vale para
+todos os próximos envios. Enquanto o assunto for o de exemplo ("TEXTO FIXO"), o envio fica bloqueado.
 
 **Enviar:**
 1. Arraste PDFs, XMLs ou pastas para a janela (ou use **Escolher pasta**, ao lado do Enviar, ou **Escolher arquivos**).
@@ -36,7 +40,7 @@ Como os enviados saem da pasta, enviar a mesma pasta de novo não repete e-mails
 - **Nenhuma senha passa pelo programa.** O login é feito pela Microsoft (OAuth 2.0); o programa guarda só
   um token, criptografado pelo Windows para o seu usuário, em `%LOCALAPPDATA%\EnviadorEmails\token_cache.bin`.
 - **Para e Cco** ficam em `%APPDATA%\EnviadorEmails\config.json`, fora do programa e do repositório.
-- Assunto e corpo são fixos no código (`core/modelo.py`) e só mudam com uma nova versão.
+- Assunto e corpo ficam no mesmo `config.json`; o texto padrão está em `core/modelo.py`.
 - Conexão sempre com TLS. Nenhuma porta é aberta no computador.
 - A atualização automática só instala o `.exe` novo se o SHA-256 bater com o publicado na Release.
 
@@ -83,18 +87,17 @@ git push origin v1.1.0
 ```
 
 O GitHub Actions roda os testes, gera o `.exe` e publica na Release (`.github/workflows/release.yml`).
-Antes, ele confere `core/modelo.py`: a release **falha** se `CLIENT_ID`/`TENANT_ID` estiverem vazios
-ou se o `ASSUNTO` ainda for o texto de exemplo.
+Antes, ele confere `core/modelo.py`: a release **falha** se `CLIENT_ID`/`TENANT_ID` estiverem vazios.
 A versão exibida no app vem da tag.
 
 ## Estrutura
 
 | Pasta/arquivo | Conteúdo |
 |---|---|
-| `core/modelo.py` | Assunto, corpo, SMTP e IDs do registro Microsoft (fixos) |
+| `core/modelo.py` | Assunto e corpo padrão, SMTP e IDs do registro Microsoft |
 | `core/envio.py` | Pares, validação, mensagem, SMTP (XOAUTH2), envio do lote, movimentação |
 | `core/conta.py` | Login Microsoft (MSAL) e cache criptografado do token |
-| `core/configuracao.py` | Para e Cco do usuário (`config.json`) |
+| `core/configuracao.py` | Para, Cco, assunto e corpo do usuário (`config.json`) |
 | `core/worker.py` | Login e envio em segundo plano para a janela |
 | `core/cli.py` | Modo terminal (`python -m core`) |
 | `core/atualizacao.py` | Busca, download e instalação de nova versão |

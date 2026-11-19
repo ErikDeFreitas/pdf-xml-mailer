@@ -3,7 +3,7 @@
     python -m core "C:\\Pasta" --vcto 20/11/2026 --dry-run   # só lista
     python -m core "C:\\Pasta" --vcto 20/11/2026             # envia
 
-Usa a conta Microsoft e o Para/Cco salvos pelo programa (abra a janela uma vez antes).
+Usa a conta Microsoft, o Para/Cco e o texto do e-mail salvos pelo programa (abra a janela uma vez antes).
 """
 from __future__ import annotations
 
@@ -49,8 +49,12 @@ def main(argv: list[str], conta_factory=Conta) -> int:
     print(f"{len(pares)} par(es) encontrado(s).")
     if args.dry_run:
         for par in pares:
-            print(f"  [dry-run] Para: {', '.join(cfg.para)} | Assunto: {envio.montar_assunto(par.nome)}")
+            assunto = envio.montar_assunto(par.nome, vcto, cfg.assunto)
+            print(f"  [dry-run] Para: {', '.join(cfg.para)} | Assunto: {assunto}")
         return 0
+    if envio.assunto_de_exemplo(cfg.assunto):
+        print('O assunto ainda é o texto de exemplo. Abra o programa e use "Configurar e-mail".')
+        return 2
 
     try:
         conta = conta_factory()
@@ -60,6 +64,7 @@ def main(argv: list[str], conta_factory=Conta) -> int:
         resultados = envio.enviar_lote(
             pares, email, cfg.para, cco, vcto,
             conectar=lambda: envio.abrir_smtp(email, conta.token()),
+            assunto=cfg.assunto, corpo=cfg.corpo,
             ao_concluir=lambda r: print(f"  {ROTULO[r.status]} {r.nome}" + (f": {r.detalhe}" if r.detalhe else "")),
         )
     except (ContaNaoConfigurada, FalhaLogin, envio.FalhaConexao) as e:

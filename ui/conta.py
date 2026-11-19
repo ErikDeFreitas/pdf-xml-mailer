@@ -5,6 +5,7 @@ Login Microsoft (no navegador, numa QThread) + Para (obrigatório) e Cco (opcion
 from __future__ import annotations
 
 import threading
+from dataclasses import replace
 from pathlib import Path
 
 from core import configuracao, envio
@@ -20,6 +21,7 @@ class ContaModal(c.Modal):
                          "Entre com a sua conta Microsoft e informe para quem os e-mails vão.",
                          "settings", "primary", parent)
         self._conta = conta
+        self._cfg = cfg
         # Sessão expirada: a conta ainda aparece no cache, mas o token não renova.
         # Força "Entrar com a Microsoft" até um login novo dar certo.
         self._precisa_login = sessao_expirada
@@ -139,7 +141,9 @@ class ContaModal(c.Modal):
             ok = False
         if not ok:
             return
-        self.resultado = Configuracao(para=para, cco=cco)
+        # Mantém o assunto e o corpo de "Configurar e-mail".
+        self.resultado = (replace(self._cfg, para=para, cco=cco) if self._cfg
+                          else Configuracao(para=para, cco=cco))
         configuracao.salvar(self.resultado, self._caminho)
         self.accept()
 

@@ -8,7 +8,7 @@ def test_atualizacao_aponta_para_este_repo():
 def test_modelo_tem_variaveis():
     from core import modelo
     assert "{nome}" in modelo.ASSUNTO
-    assert "{vcto}" in modelo.CORPO_TEXTO and "{vcto}" in modelo.CORPO_HTML
+    assert "{vcto}" in modelo.CORPO
 
 
 def test_tema_carrega():

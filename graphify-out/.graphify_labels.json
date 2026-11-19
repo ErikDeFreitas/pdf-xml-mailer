@@ -2,7 +2,6 @@
   "0": "Conta Microsoft e CLI",
   "1": "Envio do lote e pares",
   "2": "Worker de envio e testes",
-  "3": "Configuração Para/Cco",
   "4": "Atualização automática",
   "5": "Tela de envio",
   "6": "Botões e diálogos",
@@ -10,12 +9,6 @@
   "8": "Testes do modal de conta",
   "10": "Workers de login e update",
   "11": "Tema claro/escuro",
-  "13": "Layouts e rótulos",
   "14": "Testes da janela",
-  "16": "Badges e progresso",
-  "17": "FormField e erros",
-  "20": "Tabela de dados",
-  "21": "Cards",
-  "22": "Ícone temático",
   "24": "Pacote de testes"
 }

@@ -1,29 +1,24 @@
-"""Valores fixos do e-mail e do login. Mudam só com uma nova versão do programa.
+"""Valores fixos do programa e o texto PADRÃO do e-mail.
 
-Variáveis: {nome} (nome do par, no assunto) e {vcto} (vencimento, no corpo).
+Assunto e corpo podem ser trocados em "Configurar e-mail" (salvos no config.json de cada pessoa);
+os daqui valem enquanto ninguém configurar. Variáveis: {nome} (nome do par) e {vcto} (vencimento).
+No corpo, **texto** sai em negrito.
 Para e Cco NÃO ficam aqui: cada pessoa configura no primeiro acesso (core/configuracao.py).
 """
 
 ORGANIZACAO = "TCM"
 APLICACAO = "EnviadorEmails"
 
-# TODO(Erik): texto real do assunto antes da 1ª release.
+# Enquanto o assunto tiver "TEXTO FIXO", o programa pede para configurar antes de enviar.
 ASSUNTO = "EMPRESA - CTE {nome} - TEXTO FIXO DO ASSUNTO"
 
-CORPO_TEXTO = """Prezados, bom dia, tudo bem?
+CORPO = """Prezados, bom dia, tudo bem?
 
 Segue fechamento
 
-Fatura + XML
+**Fatura + XML**
 
-Vcto: {vcto}
-"""
-
-CORPO_HTML = """<p>Prezados, bom dia, tudo bem?</p>
-<p>Segue fechamento</p>
-<p><b>Fatura + XML</b></p>
-<p><b>Vcto: {vcto}</b></p>
-"""
+**Vcto: {vcto}**"""
 
 SMTP_HOST = "smtp.office365.com"
 SMTP_PORTA = 587
@@ -44,6 +39,4 @@ def pendencias_release() -> list[str]:
         faltando.append("CLIENT_ID vazio em core/modelo.py")
     if not TENANT_ID:
         faltando.append("TENANT_ID vazio em core/modelo.py")
-    if "TEXTO FIXO" in ASSUNTO:
-        faltando.append("ASSUNTO ainda é o texto de exemplo em core/modelo.py")
     return faltando

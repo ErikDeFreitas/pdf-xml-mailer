@@ -20,6 +20,7 @@ from ui import components as c
 from ui import icons
 from ui.atualizacao import VerificadorAtualizacao
 from ui.conta import ContaModal
+from ui.email import EmailModal
 from ui.themes import APLICACAO, ORGANIZACAO, SPACE, theme_manager
 from version import __version__
 
@@ -83,8 +84,11 @@ class EnviarPage(c.Page):
         self.campo_vcto = c.Input("dd/mm/aaaa")
         self.campo_vcto.setInputMask("99/99/9999;_")
         self.campo_vcto.textChanged.connect(self._atualizar_botao)
+        self.campo_vcto.textChanged.connect(self._atualizar_assunto)
         self.campo_vcto_field = c.FormField("Vencimento", self.campo_vcto, "Aparece no corpo do e-mail.")
         self.lbl_assunto = c.Label("", "muted", wrap=True)
+        self.btn_email = c.Button("Configurar e-mail", "secondary", "sm", icon="mail")
+        self.btn_email.clicked.connect(self.abrir_email)
         self.lbl_resumo = c.Label("", "muted")
         self.progresso = c.ProgressBar()
         self.progresso.hide()
@@ -100,7 +104,7 @@ class EnviarPage(c.Page):
         envio_card = c.Card("Envio")
         envio_card.add(
             self.campo_vcto_field,
-            self.lbl_assunto,
+            c.hbox(self.lbl_assunto, None, self.btn_email, spacing=SPACE["sm"]),
             self.progresso,
             c.hbox(self.lbl_resumo, None, self.botao_cancelar, self.btn_pasta, self.botao_enviar,
                    spacing=SPACE["sm"]),
@@ -129,7 +133,22 @@ class EnviarPage(c.Page):
             "O login Microsoft ainda não foi configurado nesta versão. Fale com a TI."
             if self.conta is None else "")
         self.aviso_login.setVisible(bool(self.aviso_login.text()))
+        self._atualizar_assunto()
         self._atualizar_botao()
+
+    def _assunto_pendente(self) -> bool:
+        return self.cfg is not None and envio.assunto_de_exemplo(self.cfg.assunto)
+
+    def _atualizar_assunto(self) -> None:
+        if self._assunto_pendente():
+            self.lbl_assunto.setText('O assunto ainda é o texto de exemplo. Clique em "Configurar e-mail" '
+                                     "antes de enviar.")
+        elif self._pares and self.cfg is not None:
+            vcto = self.campo_vcto.text() if self._vcto_valido() else ""
+            self.lbl_assunto.setText(
+                f"Assunto (prévia): {envio.montar_assunto(self._pares[0].nome, vcto, self.cfg.assunto)}")
+        else:
+            self.lbl_assunto.setText("")
 
     def pronto_para_configurar(self) -> bool:
         """True se falta conta logada ou Para (primeiro acesso)."""
@@ -147,7 +166,9 @@ class EnviarPage(c.Page):
         self.botao_enviar.setText(f"Enviar {_plural(n, 'e-mail', 'e-mails')}" if n else "Enviar")
         self.botao_enviar.setEnabled(
             bool(n) and self._vcto_valido() and self.cfg is not None and bool(self.email()) and not self.rodando
+            and not self._assunto_pendente()
         )
+        self.btn_email.setEnabled(self.cfg is not None and not self.rodando)
 
     # --- Arquivos -------------------------------------------------------
     def adicionar(self, caminhos: list[Path]) -> None:
@@ -173,10 +194,7 @@ class EnviarPage(c.Page):
         for aviso in self._avisos:
             nome, _, motivo = aviso.partition(": ")
             self.tabela.add_row([nome, "—", "—", c.Badge(motivo.capitalize(), STATUS["sem_par"][1])])
-        if self._pares:
-            self.lbl_assunto.setText(f"Assunto (prévia): {envio.montar_assunto(self._pares[0].nome)}")
-        else:
-            self.lbl_assunto.setText("")
+        self._atualizar_assunto()
         sem_par = len(self._avisos)
         self.lbl_resumo.setText(
             f"{_plural(len(self._pares), 'par pronto', 'pares prontos')}"
@@ -239,8 +257,14 @@ class EnviarPage(c.Page):
         self.recarregar_conta()
         return aceito
 
+    def abrir_email(self) -> None:
+        if self.cfg is None or self.rodando:
+            return
+        EmailModal(self.cfg, self.window(), self.caminho_config).exec()
+        self.recarregar_conta()
+
     def _enviar(self) -> None:
-        if self.rodando or not self._pares or self.cfg is None:
+        if self.rodando or not self._pares or self.cfg is None or self._assunto_pendente():
             return
         try:
             vcto = envio.validar_vcto(self.campo_vcto.text())
@@ -263,7 +287,8 @@ class EnviarPage(c.Page):
         self._set_rodando(True)
 
         self._thread = QThread(self)
-        self._worker = EnviarWorker(list(self._pares), list(self.cfg.para), cco, vcto, self.conta)
+        self._worker = EnviarWorker(list(self._pares), list(self.cfg.para), cco, vcto, self.conta,
+                                    assunto=self.cfg.assunto, corpo=self.cfg.corpo)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
         self._worker.iniciou_par.connect(self._ao_iniciar_par)

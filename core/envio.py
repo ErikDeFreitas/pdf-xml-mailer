@@ -6,6 +6,7 @@ import os
 import re
 import smtplib
 import ssl
+import string
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -90,25 +91,61 @@ def validar_emails(texto: str, obrigatorio: bool) -> list[str]:
     return emails
 
 
-def montar_assunto(nome: str) -> str:
+CAMPOS = ("nome", "vcto")
+_NEGRITO = re.compile(r"\*\*(.+?)\*\*")
+
+
+def validar_modelo(texto: str, rotulo: str) -> str:
+    """Assunto/corpo digitado em "Configurar e-mail": só aceita {nome} e {vcto}."""
+    texto = (texto or "").strip()
+    if not texto:
+        raise ValueError(f"Informe o {rotulo}.")
+    try:
+        campos = [campo for _, campo, _, _ in string.Formatter().parse(texto) if campo is not None]
+    except ValueError:
+        raise ValueError("Tem uma chave { ou } sem par. Use só {nome} e {vcto}.") from None
+    for campo in campos:
+        if campo not in CAMPOS:
+            raise ValueError(f"Campo desconhecido: {{{campo}}}. Use {{nome}} ou {{vcto}}.")
+    return texto
+
+
+def assunto_de_exemplo(assunto: str) -> bool:
+    """O assunto padrão é só um exemplo: precisa ser configurado antes de enviar."""
+    return "TEXTO FIXO" in assunto.upper()
+
+
+def _preencher(texto: str, nome: str, vcto: str) -> str:
+    return texto.replace("{nome}", nome).replace("{vcto}", vcto)
+
+
+def montar_assunto(nome: str, vcto: str = "", assunto: str | None = None) -> str:
     nome = nome.replace("\r", " ").replace("\n", " ").strip()
-    return modelo.ASSUNTO.replace("{nome}", nome)
+    return _preencher(assunto or modelo.ASSUNTO, nome, vcto)
 
 
-def montar_corpo(vcto: str) -> tuple[str, str]:
-    return (modelo.CORPO_TEXTO.replace("{vcto}", vcto),
-            modelo.CORPO_HTML.replace("{vcto}", html_lib.escape(vcto)))
+def montar_corpo(vcto: str, nome: str = "", corpo: str | None = None) -> tuple[str, str]:
+    """(texto, html). **x** vira negrito no HTML; linha em branco separa parágrafos."""
+    corpo = (corpo or modelo.CORPO).replace("\r\n", "\n").strip()
+    texto = _preencher(_NEGRITO.sub(r"\1", corpo), nome, vcto)
+    paragrafos = []
+    for bloco in re.split(r"\n\s*\n", corpo):
+        bloco = _NEGRITO.sub(r"<b>\1</b>", html_lib.escape(bloco.strip(), quote=False))
+        paragrafos.append("<p>" + bloco.replace("\n", "<br>") + "</p>")
+    html = _preencher("\n".join(paragrafos), html_lib.escape(nome), html_lib.escape(vcto))
+    return texto, html
 
 
 def montar_mensagem(par: Par, remetente: str, para: list[str], cco: list[str], vcto: str,
-                    pdf: bytes, xml: bytes) -> EmailMessage:
-    texto, html = montar_corpo(vcto)
+                    pdf: bytes, xml: bytes, assunto: str | None = None,
+                    corpo: str | None = None) -> EmailMessage:
+    texto, html = montar_corpo(vcto, par.nome, corpo)
     msg = EmailMessage()
     msg["From"] = remetente
     msg["To"] = ", ".join(para)
     if cco:
         msg["Bcc"] = ", ".join(cco)
-    msg["Subject"] = montar_assunto(par.nome)
+    msg["Subject"] = montar_assunto(par.nome, vcto, assunto)
     msg.set_content(texto)
     msg.add_alternative(html, subtype="html")
     msg.add_attachment(pdf, maintype="application", subtype="pdf", filename=par.pdf.name)
@@ -181,7 +218,8 @@ def enviar_lote(pares: list[Par], remetente: str, para: list[str], cco: list[str
                 ao_iniciar: Callable[[int, int, str], None] | None = None,
                 ao_concluir: Callable[[ResultadoPar], None] | None = None,
                 cancelado: Callable[[], bool] = lambda: False,
-                dormir: Callable[[float], None] = time.sleep) -> list[ResultadoPar]:
+                dormir: Callable[[float], None] = time.sleep,
+                assunto: str | None = None, corpo: str | None = None) -> list[ResultadoPar]:
     """Envia um e-mail por par numa única conexão. Um erro num par nunca derruba o lote."""
     vcto = validar_vcto(vcto)
     try:
@@ -216,7 +254,8 @@ def enviar_lote(pares: list[Par], remetente: str, para: list[str], cco: list[str
                 registrar(ResultadoPar(par.nome, "erro", invalido))
                 continue
 
-            mensagem = montar_mensagem(par, remetente, para, cco, vcto, dados_pdf, dados_xml)
+            mensagem = montar_mensagem(par, remetente, para, cco, vcto, dados_pdf, dados_xml,
+                                       assunto, corpo)
             perdida = incerto = None
             recusados = {}
             try:

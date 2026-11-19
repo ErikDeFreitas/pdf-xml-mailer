@@ -1,4 +1,8 @@
-"""Para e Cco de cada pessoa, em %APPDATA%\\EnviadorEmails\\config.json (fora do programa)."""
+r"""Configuração de cada pessoa em %APPDATA%\EnviadorEmails\config.json (fora do programa).
+
+Para e Cco (obrigatório / opcional) e o texto do e-mail (assunto e corpo). Assunto e corpo
+começam com o padrão de core/modelo.py e mudam em "Configurar e-mail".
+"""
 from __future__ import annotations
 
 import json
@@ -6,7 +10,7 @@ import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from core import envio
+from core import envio, modelo
 from core.modelo import APLICACAO
 
 
@@ -14,12 +18,22 @@ from core.modelo import APLICACAO
 class Configuracao:
     para: list[str]
     cco: list[str] = field(default_factory=list)
+    assunto: str = modelo.ASSUNTO
+    corpo: str = modelo.CORPO
 
 
 def caminho_padrao() -> Path:
     base = os.environ.get("APPDATA")
     raiz = Path(base) if base else Path.home() / "AppData" / "Roaming"
     return raiz / APLICACAO / "config.json"
+
+
+def _modelo_ou_padrao(valor, padrao: str, rotulo: str) -> str:
+    """Texto salvo, se ainda for válido; senão o padrão (nunca quebra um envio)."""
+    try:
+        return envio.validar_modelo(valor, rotulo) if isinstance(valor, str) else padrao
+    except ValueError:
+        return padrao
 
 
 def carregar(caminho: Path | None = None) -> Configuracao | None:
@@ -34,7 +48,9 @@ def carregar(caminho: Path | None = None) -> Configuracao | None:
         cco = envio.validar_emails("; ".join(dados.get("cco") or []), False)
     except (ValueError, TypeError):
         cco = []
-    return Configuracao(para=para, cco=cco)
+    return Configuracao(para=para, cco=cco,
+                        assunto=_modelo_ou_padrao(dados.get("assunto"), modelo.ASSUNTO, "assunto"),
+                        corpo=_modelo_ou_padrao(dados.get("corpo"), modelo.CORPO, "corpo"))
 
 
 def salvar(cfg: Configuracao, caminho: Path | None = None) -> None:

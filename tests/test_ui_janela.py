@@ -19,7 +19,7 @@ def app():
 def janela(tmp_path):
     import main
     caminho = tmp_path / "config.json"
-    configuracao.salvar(Configuracao(["a@b.com"], ["x@y.com"]), caminho)
+    configuracao.salvar(Configuracao(["a@b.com"], ["x@y.com"], assunto="TCM - CTE {nome}"), caminho)
     j = main.MainWindow(conta=FakeConta("eu@tcm.com"), caminho_config=caminho)
     yield j
     j.close()
@@ -54,7 +54,7 @@ def test_adicionar_monta_pares(janela, tmp_path):
     pagina.adicionar(lista)
     assert pagina.tabela.rowCount() == 3
     assert pagina.botao_enviar.text() == "Enviar 2 e-mails"
-    assert envio.montar_assunto("1") in pagina.lbl_assunto.text()
+    assert "TCM - CTE 1" in pagina.lbl_assunto.text()
 
 
 def test_adicionar_pasta(janela, tmp_path):
@@ -99,3 +99,20 @@ def test_enviado_com_aviso_nao_fica_pendente(janela, tmp_path):
     pagina._ao_concluir_par(envio.ResultadoPar("1", "aviso", "não foi movido"))
     pagina._ao_terminar_thread()
     assert [p.nome for p in pagina._pares] == ["2"]
+
+
+def test_botao_configurar_email(janela):
+    pagina = janela.pagina
+    assert pagina.btn_email.text() == "Configurar e-mail"
+    assert pagina.btn_email.parent() is pagina.lbl_assunto.parent()  # no card Envio
+
+
+def test_assunto_de_exemplo_bloqueia_envio(janela, tmp_path):
+    pagina = janela.pagina
+    configuracao.salvar(Configuracao(["a@b.com"], []), pagina.caminho_config)  # assunto padrão
+    pagina.recarregar_conta()
+    _, lista = arquivos(tmp_path)
+    pagina.adicionar(lista)
+    pagina.campo_vcto.setText("20/11/2026")
+    assert not pagina.botao_enviar.isEnabled()
+    assert "Configurar e-mail" in pagina.lbl_assunto.text()

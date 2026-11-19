@@ -32,9 +32,10 @@ class EnviarWorker(QObject):
     falhou = Signal(str)
     sessao_expirada = Signal(str)        # precisa entrar com a Microsoft de novo
 
-    def __init__(self, pares, para, cco, vcto, conta):
+    def __init__(self, pares, para, cco, vcto, conta, assunto=None, corpo=None):
         super().__init__()
         self._pares, self._para, self._cco, self._vcto = pares, para, cco, vcto
+        self._assunto, self._corpo = assunto, corpo  # texto de "Configurar e-mail"
         self._conta = conta
         self._cancelar = False
 
@@ -55,6 +56,7 @@ class EnviarWorker(QObject):
                 ao_iniciar=self.iniciou_par.emit,
                 ao_concluir=self.par_concluido.emit,
                 cancelado=lambda: self._cancelar,
+                assunto=self._assunto, corpo=self._corpo,
             )
         except FalhaLogin as e:
             self.sessao_expirada.emit(str(e))
