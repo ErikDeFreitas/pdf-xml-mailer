@@ -20,6 +20,7 @@ venv/
 build/
 dist/
 .pytest_cache/
+*.egg-info/
 
 # Instruções locais do Claude (igual ao mesclador)
 claude.md

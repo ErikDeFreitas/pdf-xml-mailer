@@ -1,8 +1,8 @@
 """Assunto e corpo editáveis em "Configurar e-mail" (salvos no config.json)."""
 import pytest
 
-from core import configuracao, envio, modelo
-from core.configuracao import Configuracao
+from enviador_pdf_xml import configuracao, envio, modelo
+from enviador_pdf_xml.configuracao import Configuracao
 from tests.test_lote import FakeSMTP, lote, pares
 
 

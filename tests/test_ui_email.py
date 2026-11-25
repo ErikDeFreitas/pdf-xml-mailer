@@ -1,17 +1,10 @@
 """Modal "Configurar e-mail": assunto e corpo salvos para os próximos envios."""
 import pytest
-from PySide6.QtWidgets import QApplication, QDialog
+from PySide6.QtWidgets import QDialog
 
-from core import configuracao, modelo
-from core.configuracao import Configuracao
-
-
-@pytest.fixture(scope="module", autouse=True)
-def app():
-    app = QApplication.instance() or QApplication([])
-    from ui.themes import theme_manager
-    theme_manager.apply()
-    return app
+from enviador_pdf_xml import configuracao, modelo
+from enviador_pdf_xml.configuracao import Configuracao
+from enviador_pdf_xml.dialogos import DialogoConta, DialogoEmail
 
 
 @pytest.fixture
@@ -22,8 +15,7 @@ def caminho(tmp_path):
 
 
 def modal(caminho):
-    from ui.email import EmailModal
-    return EmailModal(configuracao.carregar(caminho), caminho_config=caminho)
+    return DialogoEmail(configuracao.carregar(caminho), caminho_config=caminho)
 
 
 def test_abre_com_texto_salvo(caminho):
@@ -49,7 +41,7 @@ def test_campo_desconhecido_nao_salva(caminho):
     m.campo_assunto.setText("CTE {nmoe}")
     m.botao_salvar.click()
     assert m.result() != QDialog.DialogCode.Accepted
-    assert m.campo_assunto.property("error") is True
+    assert m.campo_assunto.property("erro") is True
     assert configuracao.carregar(caminho).assunto == modelo.ASSUNTO
 
 
@@ -57,7 +49,7 @@ def test_assunto_de_exemplo_nao_salva(caminho):
     m = modal(caminho)
     m.botao_salvar.click()  # ainda é o "TEXTO FIXO" padrão
     assert m.result() != QDialog.DialogCode.Accepted
-    assert m.campo_assunto.property("error") is True
+    assert m.campo_assunto.property("erro") is True
 
 
 def test_restaurar_padrao(caminho):
@@ -79,9 +71,8 @@ def test_previa_mostra_exemplo_com_negrito(caminho):
 
 def test_configuracoes_de_conta_nao_apagam_o_texto(caminho):
     from tests.test_ui_conta import FakeConta
-    from ui.conta import ContaModal
     configuracao.salvar(Configuracao(["a@b.com"], [], "NF {nome}", "Oi"), caminho)
-    m = ContaModal(FakeConta("eu@tcm.com"), configuracao.carregar(caminho), caminho_config=caminho)
+    m = DialogoConta(FakeConta("eu@tcm.com"), configuracao.carregar(caminho), caminho_config=caminho)
     m.campo_para.setText("c@d.com")
     m.botao_salvar.click()
     salvo = configuracao.carregar(caminho)

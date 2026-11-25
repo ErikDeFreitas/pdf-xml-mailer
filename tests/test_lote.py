@@ -2,7 +2,7 @@ import smtplib
 
 import pytest
 
-from core import envio
+from enviador_pdf_xml import envio
 
 PDF = b"%PDF-1.4\n"
 XML = b"<a/>"

@@ -1,28 +1,18 @@
 import pytest
-from PySide6.QtWidgets import QApplication
-
-from core import configuracao, envio
-from core.configuracao import Configuracao
+from enviador_pdf_xml import configuracao, envio
+from enviador_pdf_xml.configuracao import Configuracao
+from enviador_pdf_xml.tela import TelaEnviar
 from tests.test_lote import pares
 from tests.test_ui_conta import FakeConta
 
 
-@pytest.fixture(scope="module", autouse=True)
-def app():
-    app = QApplication.instance() or QApplication([])
-    from ui.themes import theme_manager
-    theme_manager.apply()
-    return app
-
-
 @pytest.fixture
-def janela(tmp_path):
-    import main
+def tela(qtbot, contexto, tmp_path):
     caminho = tmp_path / "config.json"
     configuracao.salvar(Configuracao(["a@b.com"], ["x@y.com"], assunto="TCM - CTE {nome}"), caminho)
-    j = main.MainWindow(conta=FakeConta("eu@tcm.com"), caminho_config=caminho)
-    yield j
-    j.close()
+    tela = TelaEnviar(contexto, FakeConta("eu@tcm.com"), caminho)
+    qtbot.addWidget(tela)
+    return tela
 
 
 def arquivos(tmp_path):
@@ -33,39 +23,39 @@ def arquivos(tmp_path):
     return docs, [p for par in lista for p in (par.pdf, par.xml)] + [docs / "3.pdf"]
 
 
-def test_janela_abre(janela):
-    pagina = janela.pagina
+def test_tela_abre(tela):
+    pagina = tela
     assert "a@b.com" in pagina.lbl_para.text()
     assert "x@y.com" in pagina.lbl_para.text()  # Cco só é exibido; edição só em Configurações
     assert "eu@tcm.com" in pagina.lbl_conta.text()
     assert not hasattr(pagina, "campo_cco")
 
 
-def test_botoes_de_envio(janela):
-    pagina = janela.pagina
+def test_botoes_de_envio(tela):
+    pagina = tela
     assert pagina.btn_pasta.parent() is pagina.botao_enviar.parent()  # lado a lado no card Envio
-    assert pagina.btn_pasta.property("variant") == "primary"         # azul
-    assert pagina.botao_enviar.property("variant") == "danger"       # vermelho
+    assert pagina.btn_pasta.property("variante") == "primario"         # azul
+    assert pagina.botao_enviar.property("variante") == "perigo"       # vermelho
 
 
-def test_adicionar_monta_pares(janela, tmp_path):
+def test_adicionar_monta_pares(tela, tmp_path):
     _, lista = arquivos(tmp_path)
-    pagina = janela.pagina
+    pagina = tela
     pagina.adicionar(lista)
     assert pagina.tabela.rowCount() == 3
-    assert pagina.botao_enviar.text() == "Enviar 2 e-mails"
+    assert pagina.botao_enviar.text().strip() == "Enviar 2 e-mails"
     assert "TCM - CTE 1" in pagina.lbl_assunto.text()
 
 
-def test_adicionar_pasta(janela, tmp_path):
+def test_adicionar_pasta(tela, tmp_path):
     docs, _ = arquivos(tmp_path)
-    janela.pagina.adicionar([docs])
-    assert janela.pagina.tabela.rowCount() == 3
+    tela.adicionar([docs])
+    assert tela.tabela.rowCount() == 3
 
 
-def test_enviar_desabilitado_sem_vencimento(janela, tmp_path):
+def test_enviar_desabilitado_sem_vencimento(tela, tmp_path):
     _, lista = arquivos(tmp_path)
-    pagina = janela.pagina
+    pagina = tela
     pagina.adicionar(lista)
     assert not pagina.botao_enviar.isEnabled()
     pagina.campo_vcto.setText("20/11/2026")
@@ -74,41 +64,41 @@ def test_enviar_desabilitado_sem_vencimento(janela, tmp_path):
     assert not pagina.botao_enviar.isEnabled()
 
 
-def test_adicionar_duas_vezes_nao_duplica(janela, tmp_path):
+def test_adicionar_duas_vezes_nao_duplica(tela, tmp_path):
     _, lista = arquivos(tmp_path)
-    janela.pagina.adicionar(lista)
-    janela.pagina.adicionar(lista)
-    assert janela.pagina.tabela.rowCount() == 3
+    tela.adicionar(lista)
+    tela.adicionar(lista)
+    assert tela.tabela.rowCount() == 3
 
 
-def test_resultado_atualiza_status_e_limpar(janela, tmp_path):
+def test_resultado_atualiza_status_e_limpar(tela, tmp_path):
     _, lista = arquivos(tmp_path)
-    pagina = janela.pagina
+    pagina = tela
     pagina.adicionar(lista)
     pagina._ao_concluir_par(envio.ResultadoPar("1", "erro", "falhou"))
     assert pagina.status_de("1") == "Erro"
     pagina.limpar()
     assert pagina.tabela.rowCount() == 0
-    assert pagina.botao_enviar.text() == "Enviar"
+    assert pagina.botao_enviar.text().strip() == "Enviar"
 
 
-def test_enviado_com_aviso_nao_fica_pendente(janela, tmp_path):
+def test_enviado_com_aviso_nao_fica_pendente(tela, tmp_path):
     _, lista = arquivos(tmp_path)
-    pagina = janela.pagina
+    pagina = tela
     pagina.adicionar(lista)
     pagina._ao_concluir_par(envio.ResultadoPar("1", "aviso", "não foi movido"))
     pagina._ao_terminar_thread()
     assert [p.nome for p in pagina._pares] == ["2"]
 
 
-def test_botao_configurar_email(janela):
-    pagina = janela.pagina
-    assert pagina.btn_email.text() == "Configurar e-mail"
+def test_botao_configurar_email(tela):
+    pagina = tela
+    assert pagina.btn_email.text().strip() == "Configurar e-mail"
     assert pagina.btn_email.parent() is pagina.lbl_assunto.parent()  # no card Envio
 
 
-def test_assunto_de_exemplo_bloqueia_envio(janela, tmp_path):
-    pagina = janela.pagina
+def test_assunto_de_exemplo_bloqueia_envio(tela, tmp_path):
+    pagina = tela
     configuracao.salvar(Configuracao(["a@b.com"], []), pagina.caminho_config)  # assunto padrão
     pagina.recarregar_conta()
     _, lista = arquivos(tmp_path)

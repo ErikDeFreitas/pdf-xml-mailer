@@ -1,5 +1,5 @@
-from core import envio
-from core.worker import EnviarWorker, LoginWorker
+from enviador_pdf_xml import envio
+from enviador_pdf_xml.worker import EnviarWorker, LoginWorker
 from tests.test_lote import FakeSMTP, pares
 
 
@@ -34,7 +34,7 @@ def test_enviar_worker_emite_resultados(tmp_path, monkeypatch):
 
 
 def test_enviar_worker_sessao_expirada(tmp_path):
-    from core.conta import FalhaLogin
+    from enviador_pdf_xml.conta import FalhaLogin
     w = EnviarWorker(pares(tmp_path, "1"), ["a@b.com"], [], "20/11/2026",
                      ContaFalsa(FalhaLogin("Sua sessão expirou.")))
     falhas = []

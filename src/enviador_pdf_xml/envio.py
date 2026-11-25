@@ -14,7 +14,7 @@ from email.message import EmailMessage
 from pathlib import Path
 from typing import Callable, Iterable
 
-from core import modelo
+from enviador_pdf_xml import modelo
 
 PASTA_ENVIADOS = "enviados"
 PASTA_ERROS = "erros"

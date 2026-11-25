@@ -1,16 +1,8 @@
-import pytest
 from PySide6.QtWidgets import QApplication, QDialog
 
-from core import configuracao
-from core.configuracao import Configuracao
-
-
-@pytest.fixture(scope="module", autouse=True)
-def app():
-    app = QApplication.instance() or QApplication([])
-    from ui.themes import theme_manager
-    theme_manager.apply()
-    return app
+from enviador_pdf_xml import configuracao
+from enviador_pdf_xml.configuracao import Configuracao
+from enviador_pdf_xml.dialogos import DialogoConta
 
 
 class FakeConta:
@@ -31,8 +23,7 @@ class FakeConta:
 
 
 def modal(conta, cfg=None, caminho=None):
-    from ui.conta import ContaModal
-    return ContaModal(conta, cfg, caminho_config=caminho)
+    return DialogoConta(conta, cfg, caminho_config=caminho)
 
 
 def test_salvar_desabilitado_sem_login(tmp_path):
@@ -64,7 +55,7 @@ def test_para_invalido_mostra_erro(tmp_path):
     m.campo_para.setText("a@b.com; nada")
     m.botao_salvar.click()
     assert m.result() != QDialog.DialogCode.Accepted
-    assert m.campo_para.property("error") is True
+    assert m.campo_para.property("erro") is True
     assert not caminho.exists()
 
 
@@ -83,8 +74,7 @@ def test_sem_conta_configurada_desabilita_login(tmp_path):
 
 
 def test_sessao_expirada_mostra_entrar(tmp_path):
-    from ui.conta import ContaModal
-    m = ContaModal(FakeConta("eu@tcm.com"), None, caminho_config=tmp_path / "c.json", sessao_expirada=True)
+    m = DialogoConta(FakeConta("eu@tcm.com"), None, caminho_config=tmp_path / "c.json", sessao_expirada=True)
     assert not m.botao_entrar.isHidden()
     assert not m.botao_salvar.isEnabled()
 
@@ -143,7 +133,7 @@ def test_login_em_segundo_plano_habilita_salvar(tmp_path):
 
 
 def test_falha_no_login_mostra_motivo_e_permite_tentar_de_novo(tmp_path):
-    from core.conta import FalhaLogin
+    from enviador_pdf_xml.conta import FalhaLogin
 
     class ContaComErro(FakeConta):
         def entrar(self):
@@ -153,3 +143,9 @@ def test_falha_no_login_mostra_motivo_e_permite_tentar_de_novo(tmp_path):
     m.botao_entrar.click()
     assert _esperar(lambda: "AADSTS500113" in m.aviso.text())
     assert m.botao_entrar.isEnabled()
+
+
+def test_aviso_de_conta_substitui_o_texto_de_nao_configurado():
+    m = DialogoConta(None, None, aviso_conta="Sem internet.")
+    assert m.aviso.text() == "Sem internet."
+    assert "fale com a ti" in DialogoConta(None, None).aviso.text().lower()

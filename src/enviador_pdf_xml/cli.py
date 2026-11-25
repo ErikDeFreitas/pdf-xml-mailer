@@ -1,7 +1,7 @@
 """Modo terminal: envia um e-mail por par PDF + XML de uma pasta.
 
-    python -m core "C:\\Pasta" --vcto 20/11/2026 --dry-run   # só lista
-    python -m core "C:\\Pasta" --vcto 20/11/2026             # envia
+    python -m enviador_pdf_xml "C:\\Pasta" --vcto 20/11/2026 --dry-run   # só lista
+    python -m enviador_pdf_xml "C:\\Pasta" --vcto 20/11/2026             # envia
 
 Usa a conta Microsoft, o Para/Cco e o texto do e-mail salvos pelo programa (abra a janela uma vez antes).
 """
@@ -10,14 +10,14 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from core import configuracao, envio
-from core.conta import Conta, ContaNaoConfigurada, FalhaLogin
+from enviador_pdf_xml import configuracao, envio
+from enviador_pdf_xml.conta import Conta, ContaNaoConfigurada, FalhaLogin
 
 ROTULO = {"enviado": "OK   ", "aviso": "AVISO", "erro": "ERRO "}
 
 
 def main(argv: list[str], conta_factory=Conta) -> int:
-    ap = argparse.ArgumentParser(prog="python -m core", description="Envia PDF + XML por e-mail.")
+    ap = argparse.ArgumentParser(prog="python -m enviador_pdf_xml", description="Envia PDF + XML por e-mail.")
     ap.add_argument("pasta", help="pasta com os PDFs e XMLs")
     ap.add_argument("--vcto", required=True, help="vencimento (dd/mm/aaaa)")
     ap.add_argument("--cco", help="cópia oculta (sem isso, usa a salva)")

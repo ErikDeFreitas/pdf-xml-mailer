@@ -1,7 +1,7 @@
 import pytest
 
-from core import cli, configuracao, envio
-from core.configuracao import Configuracao
+from enviador_pdf_xml import cli, configuracao, envio
+from enviador_pdf_xml.configuracao import Configuracao
 from tests.test_lote import FakeSMTP, pares
 
 

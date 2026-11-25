@@ -1,5 +1,5 @@
-from core import configuracao
-from core.configuracao import Configuracao
+from enviador_pdf_xml import configuracao
+from enviador_pdf_xml.configuracao import Configuracao
 
 
 def test_ida_e_volta(tmp_path):
@@ -33,5 +33,6 @@ def test_cco_invalido_vira_vazio(tmp_path):
 
 
 def test_caminho_padrao_usa_appdata(tmp_path, monkeypatch):
+    monkeypatch.delenv("ENVIADOR_DADOS")
     monkeypatch.setenv("APPDATA", str(tmp_path))
     assert configuracao.caminho_padrao() == tmp_path / "EnviadorEmails" / "config.json"

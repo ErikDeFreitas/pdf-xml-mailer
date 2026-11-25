@@ -5,15 +5,16 @@ pelo Windows (DPAPI) em %LOCALAPPDATA%\\EnviadorEmails\\token_cache.bin e é ren
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
-from core import modelo
+from enviador_pdf_xml import modelo
+from enviador_pdf_xml.dados import pasta_local
 
 TEMPO_LOGIN = 180  # segundos esperando o login no navegador
+TEMPO_REDE = 15  # segundos por requisição do MSAL (descoberta do tenant, renovação do token)
 
 class ContaNaoConfigurada(Exception):
-    """CLIENT_ID/TENANT_ID ainda não preenchidos em core/modelo.py."""
+    """CLIENT_ID/TENANT_ID ainda não preenchidos em enviador_pdf_xml/modelo.py."""
 
 
 class FalhaLogin(Exception):
@@ -21,9 +22,7 @@ class FalhaLogin(Exception):
 
 
 def caminho_cache() -> Path:
-    base = os.environ.get("LOCALAPPDATA")
-    raiz = Path(base) if base else Path.home() / "AppData" / "Local"
-    return raiz / modelo.APLICACAO / "token_cache.bin"
+    return pasta_local() / "token_cache.bin"
 
 
 def _criar_app():
@@ -37,6 +36,7 @@ def _criar_app():
         modelo.CLIENT_ID,
         authority=f"https://login.microsoftonline.com/{modelo.TENANT_ID}",
         token_cache=_criar_cache(),
+        timeout=TEMPO_REDE,
     )
 
 

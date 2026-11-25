@@ -1,8 +1,8 @@
 import pytest
 
-from core import conta as conta_mod
-from core import modelo
-from core.conta import Conta, ContaNaoConfigurada, FalhaLogin
+from enviador_pdf_xml import conta as conta_mod
+from enviador_pdf_xml import modelo
+from enviador_pdf_xml.conta import Conta, ContaNaoConfigurada, FalhaLogin
 
 
 class FakeApp:
@@ -74,11 +74,13 @@ def test_sem_client_id_levanta_conta_nao_configurada(monkeypatch):
 
 
 def test_caminho_cache_usa_localappdata(tmp_path, monkeypatch):
+    monkeypatch.delenv("ENVIADOR_DADOS")
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     assert conta_mod.caminho_cache() == tmp_path / "EnviadorEmails" / "token_cache.bin"
 
 
 def test_cache_de_token_criptografado_funciona(tmp_path, monkeypatch):
+    monkeypatch.delenv("ENVIADOR_DADOS")
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     cache = conta_mod._criar_cache()
     cache.add({"client_id": "c", "scope": ["s"], "token_endpoint": "https://login.microsoftonline.com/t/oauth2/v2.0/token",

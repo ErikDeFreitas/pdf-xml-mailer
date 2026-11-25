@@ -3,7 +3,7 @@
 Assunto e corpo podem ser trocados em "Configurar e-mail" (salvos no config.json de cada pessoa);
 os daqui valem enquanto ninguém configurar. Variáveis: {nome} (nome do par) e {vcto} (vencimento).
 No corpo, **texto** sai em negrito.
-Para e Cco NÃO ficam aqui: cada pessoa configura no primeiro acesso (core/configuracao.py).
+Para e Cco NÃO ficam aqui: cada pessoa configura no primeiro acesso (enviador_pdf_xml/configuracao.py).
 """
 
 ORGANIZACAO = "TCM"
@@ -36,7 +36,7 @@ def pendencias_release() -> list[str]:
     """O que ainda impede uma release (o workflow falha se a lista não estiver vazia)."""
     faltando = []
     if not CLIENT_ID:
-        faltando.append("CLIENT_ID vazio em core/modelo.py")
+        faltando.append("CLIENT_ID vazio em enviador_pdf_xml/modelo.py")
     if not TENANT_ID:
-        faltando.append("TENANT_ID vazio em core/modelo.py")
+        faltando.append("TENANT_ID vazio em enviador_pdf_xml/modelo.py")
     return faltando

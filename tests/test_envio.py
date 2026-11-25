@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from core import envio, modelo
+from enviador_pdf_xml import envio, modelo
 
 PDF = b"%PDF-1.4\n%fake\n"
 XML = b"<?xml version='1.0'?><a/>"

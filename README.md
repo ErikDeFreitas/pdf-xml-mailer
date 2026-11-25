@@ -40,7 +40,7 @@ Como os enviados saem da pasta, enviar a mesma pasta de novo não repete e-mails
 - **Nenhuma senha passa pelo programa.** O login é feito pela Microsoft (OAuth 2.0); o programa guarda só
   um token, criptografado pelo Windows para o seu usuário, em `%LOCALAPPDATA%\EnviadorEmails\token_cache.bin`.
 - **Para e Cco** ficam em `%APPDATA%\EnviadorEmails\config.json`, fora do programa e do repositório.
-- Assunto e corpo ficam no mesmo `config.json`; o texto padrão está em `core/modelo.py`.
+- Assunto e corpo ficam no mesmo `config.json`; o texto padrão está em `src/enviador_pdf_xml/modelo.py`.
 - Conexão sempre com TLS. Nenhuma porta é aberta no computador.
 - A atualização automática só instala o `.exe` novo se o SHA-256 bater com o publicado na Release.
 
@@ -51,57 +51,87 @@ Como os enviados saem da pasta, enviar a mesma pasta de novo não repete e-mails
    `http://localhost` e ativar "Permitir fluxos de cliente público".
 3. **Permissões de API**: Office 365 Exchange Online → permissão delegada `SMTP.Send` → conceder consentimento.
 4. Copiar o **ID do aplicativo (cliente)** e o **ID do diretório (locatário)** para `CLIENT_ID` e `TENANT_ID`
-   em `core/modelo.py` e lançar uma versão.
+   em `src/enviador_pdf_xml/modelo.py` e lançar uma versão.
 5. Nas caixas que vão enviar: **SMTP autenticado** habilitado (Exchange → Caixa de correio → E-mail → Aplicativos de e-mail).
 
 Sem os IDs, o programa abre, mas o login avisa "Fale com a TI".
 
 ## Atualização automática
 
-Ao abrir, o programa consulta a última Release no GitHub. Se houver versão nova, aparece o aviso
-**Nova versão disponível**: em **Atualizar** ele baixa o novo `.exe`, confere o SHA-256 e reabre já atualizado.
-Sem internet, nada aparece. Se um envio estiver em andamento, o aviso espera ele terminar.
+Ao abrir, o programa consulta a última Release no GitHub. Se houver versão nova (e nenhum envio
+em andamento), mostra "Atualizando para a versão X", com a barra do download, confere o SHA-256 e
+reinicia já atualizado. Se o download falhar, avisa e continua na versão atual. Sem internet, nada
+aparece.
 
 ## Desenvolver
 
+A interface vem da biblioteca [`tcm-ui`](https://github.com/ErikDeFreitas/Tcm-ui).
+
 ```
 python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-python main.py
-python -m pytest
+.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\pip install -e ".[dev]"
+.venv\Scripts\python main.py
 ```
+
+Para desenvolver junto com o `tcm-ui`, instale-o editável a partir do clone vizinho
+(`.venv\Scripts\pip install -e ..\Tcm-ui`) antes do `pip install -e ".[dev]"`.
+
+Testes (não escrevem no registro, nas pastas reais de dados nem enviam e-mail):
+
+```
+.venv\Scripts\python -m pytest -q
+```
+
+Os dados ficam onde sempre ficaram (`%APPDATA%\EnviadorEmails` e `%LOCALAPPDATA%\EnviadorEmails`);
+defina `ENVIADOR_DADOS` para usar uma única pasta, por exemplo em testes.
 
 Modo terminal (usa a conta e o Para/Cco salvos pelo programa):
 
 ```
-python -m core "C:\Pasta" --vcto 20/11/2026 --dry-run
-python -m core "C:\Pasta" --vcto 20/11/2026 [--cco copia@empresa.com.br]
+python -m enviador_pdf_xml "C:\Pasta" --vcto 20/11/2026 --dry-run
+python -m enviador_pdf_xml "C:\Pasta" --vcto 20/11/2026 [--cco copia@empresa.com.br]
 ```
+
+## Gerar o executável
+
+```
+powershell -File build.ps1
+```
+
+Gera `dist\EnviadorEmails.exe` e `dist\EnviadorEmails.exe.sha256` (precisa do PyInstaller no ambiente).
 
 ## Lançar uma versão
 
-```
-git tag v1.1.0
-git push origin v1.1.0
-```
+1. Suba `__version__` em `src/enviador_pdf_xml/__init__.py` (ex.: `2.0.1`).
+2. Crie a tag igual, com `v` na frente, e envie: `git tag v2.0.1` e `git push origin v2.0.1`.
 
-O GitHub Actions roda os testes, gera o `.exe` e publica na Release (`.github/workflows/release.yml`).
-Antes, ele confere `core/modelo.py`: a release **falha** se `CLIENT_ID`/`TENANT_ID` estiverem vazios.
-A versão exibida no app vem da tag.
+O GitHub Actions (`.github/workflows/release.yml`) confere que a tag bate com `__version__`, confere em
+`modelo.py` que `CLIENT_ID`/`TENANT_ID` estão preenchidos (a release **falha** se não estiverem), roda os
+testes, gera o `.exe` e o `.sha256` e publica a Release com os dois arquivos.
+O `requirements.txt` fixa o `tcm-ui` numa tag (`v1.3.0`), que precisa existir no GitHub.
+
+## Módulo do Sistema Financeiro
+
+O Enviador também é um módulo da casca Sistema Financeiro (`MODULO` em `src/enviador_pdf_xml/modulo.py`,
+registrado no entry point `sistema_financeiro.modulos`). Na casca ele aparece para quem está no grupo
+`SF-EnviadorPDFXML`.
 
 ## Estrutura
 
 | Pasta/arquivo | Conteúdo |
 |---|---|
-| `core/modelo.py` | Assunto e corpo padrão, SMTP e IDs do registro Microsoft |
-| `core/envio.py` | Pares, validação, mensagem, SMTP (XOAUTH2), envio do lote, movimentação |
-| `core/conta.py` | Login Microsoft (MSAL) e cache criptografado do token |
-| `core/configuracao.py` | Para, Cco, assunto e corpo do usuário (`config.json`) |
-| `core/worker.py` | Login e envio em segundo plano para a janela |
-| `core/cli.py` | Modo terminal (`python -m core`) |
-| `core/atualizacao.py` | Busca, download e instalação de nova versão |
-| `ui/` | Design System (tokens, QSS, componentes, ícones), modal de conta e de atualização |
-| `main.py` | Aplicação |
-| `EnviadorEmails.spec` | Configuração do PyInstaller |
-| `tests/` | Testes (`python -m pytest`) |
+| `src/enviador_pdf_xml/modelo.py` | Assunto e corpo padrão, SMTP e IDs do registro Microsoft |
+| `src/enviador_pdf_xml/envio.py` | Pares, validação, mensagem, SMTP (XOAUTH2), envio do lote, movimentação |
+| `src/enviador_pdf_xml/conta.py` | Login Microsoft (MSAL) e cache criptografado do token |
+| `src/enviador_pdf_xml/configuracao.py` | Para, Cco, assunto e corpo do usuário (`config.json`) |
+| `src/enviador_pdf_xml/worker.py` | Login e envio em segundo plano para a janela |
+| `src/enviador_pdf_xml/tela.py`, `dialogos.py` | Tela do módulo e diálogos de conta e de e-mail |
+| `src/enviador_pdf_xml/instancia.py` | Instância do módulo (casca e avulso) |
+| `src/enviador_pdf_xml/modulo.py` | Registro do módulo (`MODULO`) |
+| `src/enviador_pdf_xml/dados.py` | Pastas de dados |
+| `src/enviador_pdf_xml/cli.py` | Modo terminal |
+| `main.py` | Ponto de entrada do `.exe` avulso |
+| `build.ps1` | Gera o `.exe` e o `.sha256` |
+| `assets/` | Ícone do executável (`EnviadorEmails.ico`) |
+| `tests/` | Testes (pytest) |

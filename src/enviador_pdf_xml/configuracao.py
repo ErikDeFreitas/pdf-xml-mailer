@@ -1,7 +1,7 @@
 r"""Configuração de cada pessoa em %APPDATA%\EnviadorEmails\config.json (fora do programa).
 
 Para e Cco (obrigatório / opcional) e o texto do e-mail (assunto e corpo). Assunto e corpo
-começam com o padrão de core/modelo.py e mudam em "Configurar e-mail".
+começam com o padrão de enviador_pdf_xml/modelo.py e mudam em "Configurar e-mail".
 """
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from core import envio, modelo
-from core.modelo import APLICACAO
+from enviador_pdf_xml import envio, modelo
+from enviador_pdf_xml.dados import pasta_config
 
 
 @dataclass
@@ -23,9 +23,7 @@ class Configuracao:
 
 
 def caminho_padrao() -> Path:
-    base = os.environ.get("APPDATA")
-    raiz = Path(base) if base else Path.home() / "AppData" / "Roaming"
-    return raiz / APLICACAO / "config.json"
+    return pasta_config() / "config.json"
 
 
 def _modelo_ou_padrao(valor, padrao: str, rotulo: str) -> str:
