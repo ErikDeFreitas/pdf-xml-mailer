@@ -4,6 +4,7 @@ import tempfile
 # Antes de qualquer import do pacote: nenhum teste pode tocar %APPDATA%\EnviadorEmails nem %LOCALAPPDATA%\EnviadorEmails.
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ["ENVIADOR_DADOS"] = tempfile.mkdtemp(prefix="enviador_dados_")
+os.environ["TCM_CONTA_MICROSOFT"] = tempfile.mkdtemp(prefix="conta_microsoft_")
 
 import pytest  # noqa: E402
 from PySide6 import QtCore  # noqa: E402

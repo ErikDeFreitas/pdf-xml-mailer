@@ -1,7 +1,7 @@
 import importlib
 from pathlib import Path
 
-from enviador_pdf_xml import conta, dados, modelo
+from enviador_pdf_xml import dados, modelo
 
 
 def test_enviador_dados_substitui_as_duas_pastas(tmp_path, monkeypatch):
@@ -27,21 +27,3 @@ def test_importar_nao_cria_pasta(tmp_path, monkeypatch):
     assert isinstance(dados.PASTA, Path)
 
 
-def test_criar_app_mesmos_parametros(monkeypatch):
-    import msal
-    from msal_extensions import PersistedTokenCache
-
-    guardado = {}
-
-    class AppFalso:
-        def __init__(self, client_id, **kw):
-            guardado["client_id"] = client_id
-            guardado.update(kw)
-
-    monkeypatch.setattr(msal, "PublicClientApplication", AppFalso)
-    conta._criar_app()
-    assert guardado["client_id"] == modelo.CLIENT_ID
-    assert guardado["authority"] == f"https://login.microsoftonline.com/{modelo.TENANT_ID}"
-    assert isinstance(guardado["token_cache"], PersistedTokenCache)
-    assert guardado["timeout"] == 15
-    assert conta.caminho_cache().parent.exists()

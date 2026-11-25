@@ -9,7 +9,7 @@ from tcm_ui.components import Modal
 
 from enviador_pdf_xml import configuracao, instancia
 from enviador_pdf_xml.configuracao import Configuracao
-from enviador_pdf_xml.conta import ContaNaoConfigurada
+from tcm_ui.microsoft import ContaNaoConfigurada
 from enviador_pdf_xml.instancia import Enviador
 from tests.test_lote import FakeSMTP, pares
 from tests.test_ui_conta import FakeConta
@@ -119,7 +119,7 @@ def test_ao_sair_do_programa_cancela_e_espera_a_thread(qtbot, inst, tmp_path, mo
         original(msg)
 
     smtp.send_message = devagar
-    monkeypatch.setattr("enviador_pdf_xml.envio.abrir_smtp", lambda email, token: smtp)
+    monkeypatch.setattr("tcm_ui.microsoft.abrir_smtp", lambda email, token: smtp)
     monkeypatch.setattr(Modal, "confirmar", classmethod(lambda cls, *a, **k: True))
 
     tela._enviar()
@@ -266,3 +266,19 @@ def test_tela_destruida_antes_da_conta_nao_levanta(qtbot, inst, monkeypatch):
     qtbot.wait(300)
     assert erros == []
     inst.tela = None
+
+
+def test_migra_o_login_antigo_ao_abrir(qtbot, inst, monkeypatch, tmp_path):
+    """O login da 2.0 (cache em ENVIADOR_DADOS) vai para o cache compartilhado: ninguém precisa entrar de novo."""
+    from enviador_pdf_xml import dados
+
+    monkeypatch.setenv("TCM_CONTA_MICROSOFT", str(tmp_path / "novo"))
+    antigo = dados.pasta_local() / "token_cache.bin"
+    antigo.parent.mkdir(parents=True, exist_ok=True)
+    antigo.write_bytes(b"C")
+    try:
+        tela = inst.widget("enviar")
+        qtbot.waitUntil(lambda: tela.conta is not None, timeout=3000)
+        assert (tmp_path / "novo" / "token_cache.bin").read_bytes() == b"C"
+    finally:
+        antigo.unlink()

@@ -1,3 +1,4 @@
+from tcm_ui import microsoft
 import pytest
 
 from enviador_pdf_xml import cli, configuracao, envio
@@ -53,7 +54,7 @@ def test_cli_envia_com_conta_falsa(tmp_path, com_config, monkeypatch, capsys):
     pasta.mkdir()
     pares(pasta, "1")
     smtp = FakeSMTP()
-    monkeypatch.setattr(envio, "abrir_smtp", lambda email, token: smtp)
+    monkeypatch.setattr(microsoft, "abrir_smtp", lambda email, token: smtp)
     monkeypatch.setattr(envio.time, "sleep", lambda s: None)
     assert cli.main([str(pasta), "--vcto", "20/11/2026"], conta_factory=ContaFalsa) == 0
     assert (pasta / "enviados" / "1.pdf").exists()

@@ -11,7 +11,8 @@ import argparse
 from pathlib import Path
 
 from enviador_pdf_xml import configuracao, envio
-from enviador_pdf_xml.conta import Conta, ContaNaoConfigurada, FalhaLogin
+from tcm_ui import microsoft
+from tcm_ui.microsoft import Conta, ContaNaoConfigurada, FalhaLogin
 
 ROTULO = {"enviado": "OK   ", "aviso": "AVISO", "erro": "ERRO "}
 
@@ -63,7 +64,7 @@ def main(argv: list[str], conta_factory=Conta) -> int:
             raise FalhaLogin("Nenhuma conta logada. Abra o programa e entre com a Microsoft.")
         resultados = envio.enviar_lote(
             pares, email, cfg.para, cco, vcto,
-            conectar=lambda: envio.abrir_smtp(email, conta.token()),
+            conectar=lambda: microsoft.abrir_smtp(email, conta.token()),
             assunto=cfg.assunto, corpo=cfg.corpo,
             ao_concluir=lambda r: print(f"  {ROTULO[r.status]} {r.nome}" + (f": {r.detalhe}" if r.detalhe else "")),
         )

@@ -2,27 +2,9 @@
 from PySide6.QtCore import QObject, Signal, Slot
 
 from enviador_pdf_xml import envio
-from enviador_pdf_xml.conta import ContaNaoConfigurada, FalhaLogin
+from tcm_ui import microsoft
+from tcm_ui.microsoft import ContaNaoConfigurada, FalhaLogin
 
-
-class LoginWorker(QObject):
-    concluido = Signal(str)  # e-mail logado
-    falhou = Signal(str)
-
-    def __init__(self, conta):
-        super().__init__()
-        self._conta = conta
-
-    @Slot()
-    def run(self) -> None:
-        try:
-            email = self._conta.entrar()
-        except (FalhaLogin, ContaNaoConfigurada) as e:
-            self.falhou.emit(str(e))
-        except Exception as e:  # noqa: BLE001
-            self.falhou.emit(f"Erro inesperado no login: {type(e).__name__}: {e}")
-        else:
-            self.concluido.emit(email)
 
 
 class EnviarWorker(QObject):
@@ -52,7 +34,7 @@ class EnviarWorker(QObject):
             conta.token()  # confere a sessão antes de conectar
             resultados = envio.enviar_lote(
                 self._pares, email, self._para, self._cco, self._vcto,
-                conectar=lambda: envio.abrir_smtp(email, conta.token()),
+                conectar=lambda: microsoft.abrir_smtp(email, conta.token()),
                 ao_iniciar=self.iniciou_par.emit,
                 ao_concluir=self.par_concluido.emit,
                 cancelado=lambda: self._cancelar,

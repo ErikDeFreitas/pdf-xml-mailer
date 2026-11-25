@@ -41,32 +41,6 @@ def lote(lista, conectar, **kw):
     return envio.enviar_lote(lista, "eu@tcm.com", ["a@b.com"], [], "20/11/2026", conectar, **kw)
 
 
-def test_xoauth2_formato():
-    assert envio.xoauth2("a@b.com", "T") == "user=a@b.com\x01auth=Bearer T\x01\x01"
-
-
-def test_abrir_smtp_usa_xoauth2():
-    chamadas = []
-
-    class Fabrica:
-        def __init__(self, host, porta, timeout):
-            chamadas.append(("conectar", host, porta, timeout))
-
-        def ehlo(self):
-            chamadas.append(("ehlo",))
-
-        def starttls(self, context):
-            chamadas.append(("starttls",))
-
-        def auth(self, mecanismo, objeto, initial_response_ok=True):
-            chamadas.append(("auth", mecanismo, objeto()))
-
-    envio.abrir_smtp("a@b.com", "T", fabrica=Fabrica)
-    assert chamadas[0] == ("conectar", "smtp.office365.com", 587, 30)
-    assert ("starttls",) in chamadas
-    assert chamadas[-1] == ("auth", "XOAUTH2", "user=a@b.com\x01auth=Bearer T\x01\x01")
-
-
 def test_lote_tudo_ok(tmp_path):
     smtp, pausas = FakeSMTP(), []
     r = lote(pares(tmp_path, "1", "2"), lambda: smtp, dormir=pausas.append)

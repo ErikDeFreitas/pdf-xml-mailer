@@ -23,7 +23,7 @@ def test_build_usa_nome_do_exe():
 
 def test_requirements_fixa_tcm_ui():
     texto = (RAIZ / "requirements.txt").read_text(encoding="utf-8")
-    assert re.search(r"tcm-ui @ git\+https://github.com/ErikDeFreitas/Tcm-ui@v\d+\.\d+\.\d+", texto)
+    assert re.search(r"tcm-ui\[microsoft\] @ git\+https://github.com/ErikDeFreitas/Tcm-ui@v\d+\.\d+\.\d+", texto)
 
 
 def test_sha256_legivel_pelos_dois_atualizadores():
@@ -44,7 +44,6 @@ def test_tema_antigo_e_lido(tmp_path):
     assert gerente.nome == "escuro"
 
 
-def test_workflow_confere_login_e_versao():
+def test_workflow_confere_a_versao():
     texto = (RAIZ / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
-    assert "pendencias_release" in texto
     assert "__version__" in texto

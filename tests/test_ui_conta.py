@@ -133,7 +133,7 @@ def test_login_em_segundo_plano_habilita_salvar(tmp_path):
 
 
 def test_falha_no_login_mostra_motivo_e_permite_tentar_de_novo(tmp_path):
-    from enviador_pdf_xml.conta import FalhaLogin
+    from tcm_ui.microsoft import FalhaLogin
 
     class ContaComErro(FakeConta):
         def entrar(self):

@@ -11,7 +11,7 @@ def test_valores_do_modulo():
     assert (MODULO.id, MODULO.nome, MODULO.icone) == ("enviador_pdf_xml", "Enviador de PDF + XML", "email")
     assert (MODULO.grupo_ad, MODULO.repositorio, MODULO.nome_exe) == (
         "SF-EnviadorPDFXML", "ErikDeFreitas/pdf-xml-mailer", "EnviadorEmails.exe")
-    assert MODULO.versao == enviador_pdf_xml.__version__ == "2.0.0"
+    assert MODULO.versao == enviador_pdf_xml.__version__ == "2.1.0"
     assert MODULO.aplicacao_settings == "EnviadorEmails"
     assert [(p.chave, p.titulo, p.subtitulo, p.icone) for p in MODULO.paginas] == [
         ("enviar", "Enviar PDF + XML", "Um e-mail por par de arquivos com o mesmo nome.", "enviar")]

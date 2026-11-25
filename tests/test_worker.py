@@ -1,5 +1,6 @@
+from tcm_ui import microsoft
 from enviador_pdf_xml import envio
-from enviador_pdf_xml.worker import EnviarWorker, LoginWorker
+from enviador_pdf_xml.worker import EnviarWorker
 from tests.test_lote import FakeSMTP, pares
 
 
@@ -22,7 +23,7 @@ class ContaFalsa:
 
 
 def test_enviar_worker_emite_resultados(tmp_path, monkeypatch):
-    monkeypatch.setattr(envio, "abrir_smtp", lambda e, t: FakeSMTP())
+    monkeypatch.setattr(microsoft, "abrir_smtp", lambda e, t: FakeSMTP())
     monkeypatch.setattr(envio.time, "sleep", lambda s: None)
     w = EnviarWorker(pares(tmp_path, "1", "2"), ["a@b.com"], [], "20/11/2026", ContaFalsa())
     por_par, fim = [], []
@@ -34,7 +35,7 @@ def test_enviar_worker_emite_resultados(tmp_path, monkeypatch):
 
 
 def test_enviar_worker_sessao_expirada(tmp_path):
-    from enviador_pdf_xml.conta import FalhaLogin
+    from tcm_ui.microsoft import FalhaLogin
     w = EnviarWorker(pares(tmp_path, "1"), ["a@b.com"], [], "20/11/2026",
                      ContaFalsa(FalhaLogin("Sua sessão expirou.")))
     falhas = []
@@ -43,10 +44,3 @@ def test_enviar_worker_sessao_expirada(tmp_path):
     assert falhas and "sessão expirou" in falhas[0]
     assert (tmp_path / "1.pdf").exists()
 
-
-def test_login_worker():
-    w = LoginWorker(ContaFalsa())
-    ok = []
-    w.concluido.connect(ok.append)
-    w.run()
-    assert ok == ["eu@tcm.com"]

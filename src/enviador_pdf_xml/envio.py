@@ -5,7 +5,6 @@ import html as html_lib
 import os
 import re
 import smtplib
-import ssl
 import string
 import time
 from dataclasses import dataclass
@@ -190,19 +189,6 @@ class ResultadoPar:
 
 
 _QUEDA = (smtplib.SMTPServerDisconnected, ConnectionError)
-
-
-def xoauth2(email: str, token: str) -> str:
-    return f"user={email}\x01auth=Bearer {token}\x01\x01"
-
-
-def abrir_smtp(email: str, token: str, fabrica=smtplib.SMTP) -> smtplib.SMTP:
-    server = fabrica(modelo.SMTP_HOST, modelo.SMTP_PORTA, timeout=modelo.TIMEOUT)
-    server.ehlo()
-    server.starttls(context=ssl.create_default_context())
-    server.ehlo()
-    server.auth("XOAUTH2", lambda _=None: xoauth2(email, token), initial_response_ok=True)
-    return server
 
 
 def _fechar(server) -> None:

@@ -38,7 +38,9 @@ Como os enviados saem da pasta, enviar a mesma pasta de novo não repete e-mails
 ## Segurança
 
 - **Nenhuma senha passa pelo programa.** O login é feito pela Microsoft (OAuth 2.0); o programa guarda só
-  um token, criptografado pelo Windows para o seu usuário, em `%LOCALAPPDATA%\EnviadorEmails\token_cache.bin`.
+  um token, criptografado pelo Windows para o seu usuário, em `%LOCALAPPDATA%\TCM\ContaMicrosoft\token_cache.bin`.
+  Esse login é compartilhado com os outros sistemas da TCM que enviam e-mail (ex.: RoboAgregado): quem entrou
+  num deles já está logado nos outros. Na 2.1.0, o login da versão anterior é copiado para lá automaticamente.
 - **Para e Cco** ficam em `%APPDATA%\EnviadorEmails\config.json`, fora do programa e do repositório.
 - Assunto e corpo ficam no mesmo `config.json`; o texto padrão está em `src/enviador_pdf_xml/modelo.py`.
 - Conexão sempre com TLS. Nenhuma porta é aberta no computador.
@@ -51,7 +53,7 @@ Como os enviados saem da pasta, enviar a mesma pasta de novo não repete e-mails
    `http://localhost` e ativar "Permitir fluxos de cliente público".
 3. **Permissões de API**: Office 365 Exchange Online → permissão delegada `SMTP.Send` → conceder consentimento.
 4. Copiar o **ID do aplicativo (cliente)** e o **ID do diretório (locatário)** para `CLIENT_ID` e `TENANT_ID`
-   em `src/enviador_pdf_xml/modelo.py` e lançar uma versão.
+   em `src/tcm_ui/microsoft.py` do repositório `Tcm-ui` e lançar uma versão (vale para todos os sistemas).
 5. Nas caixas que vão enviar: **SMTP autenticado** habilitado (Exchange → Caixa de correio → E-mail → Aplicativos de e-mail).
 
 Sem os IDs, o programa abre, mas o login avisa "Fale com a TI".
@@ -106,10 +108,9 @@ Gera `dist\EnviadorEmails.exe` e `dist\EnviadorEmails.exe.sha256` (precisa do Py
 1. Suba `__version__` em `src/enviador_pdf_xml/__init__.py` (ex.: `2.0.1`).
 2. Crie a tag igual, com `v` na frente, e envie: `git tag v2.0.1` e `git push origin v2.0.1`.
 
-O GitHub Actions (`.github/workflows/release.yml`) confere que a tag bate com `__version__`, confere em
-`modelo.py` que `CLIENT_ID`/`TENANT_ID` estão preenchidos (a release **falha** se não estiverem), roda os
+O GitHub Actions (`.github/workflows/release.yml`) confere que a tag bate com `__version__`, roda os
 testes, gera o `.exe` e o `.sha256` e publica a Release com os dois arquivos.
-O `requirements.txt` fixa o `tcm-ui` numa tag (`v1.3.0`), que precisa existir no GitHub.
+O `requirements.txt` fixa o `tcm-ui[microsoft]` numa tag (`v1.6.0`), que precisa existir no GitHub.
 
 ## Módulo do Sistema Financeiro
 
@@ -121,11 +122,10 @@ registrado no entry point `sistema_financeiro.modulos`). Na casca ele aparece pa
 
 | Pasta/arquivo | Conteúdo |
 |---|---|
-| `src/enviador_pdf_xml/modelo.py` | Assunto e corpo padrão, SMTP e IDs do registro Microsoft |
+| `src/enviador_pdf_xml/modelo.py` | Assunto e corpo padrão |
 | `src/enviador_pdf_xml/envio.py` | Pares, validação, mensagem, SMTP (XOAUTH2), envio do lote, movimentação |
-| `src/enviador_pdf_xml/conta.py` | Login Microsoft (MSAL) e cache criptografado do token |
 | `src/enviador_pdf_xml/configuracao.py` | Para, Cco, assunto e corpo do usuário (`config.json`) |
-| `src/enviador_pdf_xml/worker.py` | Login e envio em segundo plano para a janela |
+| `src/enviador_pdf_xml/worker.py` | Envio em segundo plano para a janela (o login vem de `tcm_ui.microsoft`) |
 | `src/enviador_pdf_xml/tela.py`, `dialogos.py` | Tela do módulo e diálogos de conta e de e-mail |
 | `src/enviador_pdf_xml/instancia.py` | Instância do módulo (casca e avulso) |
 | `src/enviador_pdf_xml/modulo.py` | Registro do módulo (`MODULO`) |

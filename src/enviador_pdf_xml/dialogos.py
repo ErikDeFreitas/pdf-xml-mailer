@@ -1,17 +1,16 @@
 """Diálogos do Enviador: "Conta e destino" (primeiro acesso e Configurações) e "Configurar e-mail"."""
 
-import threading
 from dataclasses import replace
 from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHBoxLayout
 from tcm_ui.components import AreaTexto, Botao, Campo, CampoTexto, Cartao, Modal, Texto
+from tcm_ui.microsoft_ui import CartaoContaMicrosoft
 from tcm_ui.themes import ESPACO
 
 from enviador_pdf_xml import configuracao, envio, modelo
 from enviador_pdf_xml.configuracao import Configuracao
-from enviador_pdf_xml.worker import LoginWorker
 
 EXEMPLO_NOME = "123456"
 EXEMPLO_VCTO = "31/12/2026"
@@ -30,37 +29,21 @@ def _linha(*itens) -> QHBoxLayout:
 
 
 class DialogoConta(Modal):
-    """Login Microsoft (no navegador, numa thread) + Para (obrigatório) e Cco (opcional)."""
+    """Login Microsoft (bloco do tcm_ui) + Para (obrigatório) e Cco (opcional)."""
 
     def __init__(self, conta, cfg: Configuracao | None, parent=None, caminho_config: Path | None = None,
                  primeiro_acesso: bool = False, sessao_expirada: bool = False, aviso_conta: str = ""):
         super().__init__("Bem-vindo! Configure o envio" if primeiro_acesso else "Conta e destino",
                          "Entre com a sua conta Microsoft e informe para quem os e-mails vão.",
                          parent, "info")
-        self._conta = conta
         self._cfg = cfg
-        self._aviso_conta = aviso_conta  # por que não há conta (ex.: sem internet)
-        # Sessão expirada: a conta ainda aparece no cache, mas o token não renova.
-        # Força "Entrar com a Microsoft" até um login novo dar certo.
-        self._precisa_login = sessao_expirada
         self._caminho = caminho_config
-        # Login em andamento. Roda numa thread daemon: se a Microsoft parar numa página de erro,
-        # o MSAL só desiste no tempo limite, e a pessoa precisa poder fechar o diálogo antes disso.
-        self._worker: LoginWorker | None = None
         self.resultado: Configuracao | None = None
 
-        # Conta
-        self.rotulo_conta = Texto("")
-        self.aviso = Texto("", "dica")
-        self.aviso.setWordWrap(True)
-        self.botao_entrar = Botao("Entrar com a Microsoft", "primario")
-        self.botao_entrar.clicked.connect(self._entrar)
-        self.botao_sair = Botao("Sair da conta", "fantasma", "sm", icone="sair")
-        self.botao_sair.clicked.connect(self._sair)
-        self.corpo.addWidget(Texto("Conta de envio", "rotulo"))
-        self.corpo.addLayout(_linha(self.rotulo_conta, None, self.botao_sair))
-        self.corpo.addWidget(self.botao_entrar)
-        self.corpo.addWidget(self.aviso)
+        self.cartao = CartaoContaMicrosoft(conta, aviso_sem_conta=aviso_conta, sessao_expirada=sessao_expirada)
+        self.rotulo_conta, self.aviso = self.cartao.rotulo_conta, self.cartao.aviso
+        self.botao_entrar, self.botao_sair = self.cartao.botao_entrar, self.cartao.botao_sair
+        self.corpo.addWidget(self.cartao)
 
         # Destino
         self.campo_para = CampoTexto("destino@cliente.com.br")
@@ -78,75 +61,20 @@ class DialogoConta(Modal):
         self.botao_salvar.setDefault(True)
         self.botao_salvar.clicked.connect(self._salvar)
 
+        self.cartao.mudou.connect(self._atualizar)
         self._atualizar()
 
     # ------------------------------------------------------------------
-    def _email(self) -> str | None:
-        if self._conta is None or self._precisa_login:
-            return None
-        return self._conta.email()
-
     def _atualizar(self) -> None:
-        email = self._email()
-        logado = bool(email)
-        texto = "Sua sessão expirou. Entre novamente." if self._precisa_login else "Nenhuma conta conectada"
-        self.rotulo_conta.setText(email or texto)
-        self.botao_sair.setVisible(logado)
-        self.botao_entrar.setVisible(not logado)
-        self.botao_entrar.setEnabled(self._conta is not None and self._worker is None)
-        self.botao_salvar.setEnabled(logado)
-        if self._conta is None:
-            self.aviso.setText(self._aviso_conta or
-                               "O login Microsoft ainda não foi configurado nesta versão. Fale com a TI.")
-        self.aviso.setVisible(bool(self.aviso.text()))
+        self.botao_salvar.setEnabled(bool(self.cartao.email()))
         self._reajustar()
 
     def _reajustar(self) -> None:
         if self.isVisible():  # antes de exibir, o showEvent já calcula a altura
             self.reajustar_altura()
 
-    def _entrar(self) -> None:
-        self.botao_entrar.setText("Aguardando login no navegador…")
-        self.aviso.setText("Se o navegador mostrar um erro, feche esta janela ou clique em Cancelar.")
-        worker = LoginWorker(self._conta)
-        worker.concluido.connect(self._fim_login)  # entregue na thread da interface (fila do Qt)
-        worker.falhou.connect(self._falha_login)
-        self._worker = worker
-        self._atualizar()
-        threading.Thread(target=worker.run, name="login-microsoft", daemon=True).start()
-
-    def _fim_login(self, _email: str) -> None:
-        self._precisa_login = False
-        self.aviso.setText("")
-        self._login_terminou()
-
-    def _falha_login(self, mensagem: str) -> None:
-        self.aviso.setText(mensagem)
-        self._login_terminou()
-
-    def _login_terminou(self) -> None:
-        self._worker = None
-        self.botao_entrar.setText("Entrar com a Microsoft")
-        self._atualizar()
-
-    def _abandonar_login(self) -> None:
-        """Solta o login em andamento: a thread termina sozinha no tempo limite e ninguém a escuta."""
-        if self._worker is None:
-            return
-        for sinal in (self._worker.concluido, self._worker.falhou):
-            try:
-                sinal.disconnect()
-            except (RuntimeError, TypeError):
-                pass
-        self._login_terminou()
-
-    def _sair(self) -> None:
-        if self._conta is not None:
-            self._conta.sair()
-        self._atualizar()
-
     def _salvar(self) -> None:
-        if not self._email():
+        if not self.cartao.email():
             return
         ok = True
         try:
@@ -171,7 +99,7 @@ class DialogoConta(Modal):
         self.accept()
 
     def done(self, r: int) -> None:
-        self._abandonar_login()  # X, Cancelar ou Esc fecham mesmo com o login aberto no navegador
+        self.cartao.abandonar_login()  # X, Cancelar ou Esc fecham mesmo com o login aberto no navegador
         super().done(r)
 
 

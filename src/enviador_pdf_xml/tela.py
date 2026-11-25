@@ -6,6 +6,7 @@ from PySide6.QtCore import Qt, QThread, QTimer
 from PySide6.QtWidgets import QApplication, QFileDialog, QHBoxLayout, QLabel
 from tcm_ui import icons
 from tcm_ui.components import BarraProgresso, Botao, Campo, CampoTexto, Cartao, Etiqueta, Modal, Pagina, Tabela, Texto
+from tcm_ui.microsoft import AVISO_NAO_CONFIGURADA
 from tcm_ui.modulo import Contexto
 from tcm_ui.themes import ESPACO, TAMANHOS, tema
 
@@ -23,7 +24,6 @@ STATUS = {  # status -> (texto, tom da Etiqueta)
     "sem_par": ("Sem par", "aviso"),
 }
 
-AVISO_NAO_CONFIGURADA = "O login Microsoft ainda não foi configurado nesta versão. Fale com a TI."
 AVISO_CONECTANDO = "Conectando à conta Microsoft…"
 
 COL_NOME = 0
